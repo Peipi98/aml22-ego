@@ -113,7 +113,7 @@ class EpicKitchensDataset(data.Dataset, ABC):
             # the randint shifts a little (to add randomicity among clips)
             average_duration = record.num_frames[modality] // self.num_frames_per_clip[modality]
             if average_duration > 0:
-                for _ in self.num_clips:
+                for _ in range(self.num_clips):
                     frame_idx = np.multiply(list(range(self.num_frames_per_clip[modality])), average_duration) + \
                                 randint(average_duration, size=self.num_frames_per_clip[modality])
                     indices.extend(frame_idx.tolist())
