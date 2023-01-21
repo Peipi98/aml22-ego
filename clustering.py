@@ -8,18 +8,20 @@ import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import os
 
-features = []
+
 
 def getImage(path, zoom=1):
     return OffsetImage(plt.imread(path), zoom=zoom)
 
-
+paths = ['./saved_features/dense/test', './saved_features/dense/train','./saved_features/uniform/test', './saved_features/uniform/train']
 # Function to load features from saved_features folder and cluster them through K-means
-def k_means():
+def k_means(_path):
     # Load features from saved_features folder
-    global features
-    for file in os.listdir('./saved_features/dense/test'):
-        path = os.path.join('./saved_features/dense/test', file)
+    features = []
+    file_name = []
+    for file in os.listdir(_path):
+        path = os.path.join(_path, file)
+        file_name.append(file.split('.')[0])
         tmp = open(path, 'rb')
         pk_file = pk.load(tmp)
         tmp.close()
@@ -29,10 +31,12 @@ def k_means():
             tmp_arr.append(feat['features_RGB'])
         features.append(np.array(tmp_arr))
 
-
+    type = _path.split('/')[-1]
+    sampling = _path.split('/')[-2]
     # Convert features to numpy array
     features = np.array(features)
-    features = features.reshape(-1,features.shape[1]*features.shape[2])
+    print(features.shape)
+    features = features.reshape(features.shape[0],features.shape[1],features.shape[2]*features.shape[3])
     # Create K-means object
    
     scaled_arr = features
@@ -44,43 +48,49 @@ def k_means():
     # Choose features index
     #index = 2
     pca = PCA(2)
-    scaled_arr = pca.fit_transform(scaled_arr)
+    frames = [5,10,16,25]
+    for i in range(features.shape[0]):
+        scaled_arr = pca.fit_transform(features[i])
+        print(scaled_arr.shape)
 
-    kmeans = KMeans(n_clusters=8, random_state=42)
+        kmeans = KMeans(n_clusters=8, random_state=42)
 
-    # Get labels
-    #labels = kmeans.labels_
-    labels_pred = kmeans.fit_predict(scaled_arr)
-    #print(labels)
-    print(labels_pred)
-    # Get centroids
-    centroids = kmeans.cluster_centers_
-    print(centroids.shape)
-    # Create dataframe
-    #df = pd.DataFrame()
+        # Get labels
+        #labels = kmeans.labels_
+        labels_pred = kmeans.fit_predict(scaled_arr)
+        #print(labels)
+        
+        # Get centroids
+        centroids = kmeans.cluster_centers_
+    
+        # Create dataframe
+        #df = pd.DataFrame()
 
-    c_frames_dict = extract_central_frames()
-    image_path = []
-    print(c_frames_dict[1])
-    for l in c_frames_dict[1]:
+        c_frames_dict = extract_central_frames()
+        image_path = []
+        #print(c_frames_dict[1])
+        frames_list = c_frames_dict[0] if type == 'train' else c_frames_dict[1]
+        for l in frames_list:
 
-        image_path.append(l['path'])
-    #print(image_path)
+            image_path.append(l['path'])
+        #print(image_path)
 
-    # Plot clusters using images from test_image_path as markers
-    fig, ax = plt.subplots()
-    ax.scatter(scaled_arr[:, 0], scaled_arr[:, 1], c=labels_pred, s=0, cmap='viridis')
-    #ax.scatter(centroids[:, 0], centroids[:, 1], c='red', s=250, alpha=1)
-    for x0, y0, path in zip(scaled_arr[:, 0], scaled_arr[:, 1], image_path):
-        ab = AnnotationBbox(getImage(path, 0.1), (x0, y0), frameon=False)
-        ax.add_artist(ab)
-
-    # Save dataframe to csv
-    #df.to_csv('k_means.csv')
-    # Plot clusters
-    #plt.scatter(scaled_arr[:, 0], scaled_arr[:, 1], c=labels_pred, s=50, cmap='viridis')
-    #plt.scatter(centroids[:, 0], centroids[:, 1], c='red', s=250, alpha=1)
-    plt.show()
+        # Plot clusters using images from test_image_path as markers
+        fig, ax = plt.subplots()
+        ax.scatter(scaled_arr[:, 0], scaled_arr[:, 1], c=labels_pred, s=0, cmap='viridis')
+        #ax.scatter(centroids[:, 0], centroids[:, 1], c='red', s=250, alpha=1)
+        for x0, y0, path in zip(scaled_arr[:, 0], scaled_arr[:, 1], image_path):
+            ab = AnnotationBbox(getImage(path, 0.1), (x0, y0), frameon=False)
+            ax.add_artist(ab)
+        # Save dataframe to csv
+        #df.to_csv('k_means.csv')
+        # Plot clusters
+        #plt.scatter(scaled_arr[:, 0], scaled_arr[:, 1], c=labels_pred, s=50, cmap='viridis')
+        #plt.scatter(centroids[:, 0], centroids[:, 1], c='red', s=250, alpha=1)
+        #plt.rcParams["figure.figsize"] = (8,5.5)
+        #plt.savefig(f'./plots/k-means/{sampling}/{type}/{file_name[i]}.png', dpi=300)
+        plt.title(f'K-Means of {type}-set with {sampling} sampling of {frames[i]} frames')
+        plt.show()
 
 def extract_central_frames():
     # Load features from saved_features folder
@@ -91,7 +101,7 @@ def extract_central_frames():
         pk_file = pk.load(tmp)
         tmp.close()
         split = []
-        print(pk_file)
+        #print(pk_file)
         for i,line in pk_file.iterrows():
                 s = dict()
                 s['uid'] = line['uid']
@@ -106,4 +116,6 @@ def extract_central_frames():
 
     return splits
 
-k_means()
+print(paths)
+for p in paths:
+    k_means(p)
