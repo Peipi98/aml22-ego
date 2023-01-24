@@ -15,17 +15,20 @@ class TSNClassifier(nn.Module):
         return x
 
 # Initialize the classifier
-num_classes = 10  # Example value, replace with the number of classes in your dataset
+num_classes = 8  # Example value, replace with the number of classes in your dataset
 model = TSNClassifier(num_classes)
 
 # Define loss function and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
 
+def load_features():
+
+
 # Training loop
-for i in range(num_epochs):
+for i in range(10):
     # Extract features for each segment
-    segment_features = [extract_features(segment) for segment in segments]  # replace with your feature extraction method
+    segment_features = [load_features(segment) for segment in segments]  # replace with your feature extraction method
     # Concatenate the features from all segments
     concatenated_features = torch.cat(segment_features, dim=1)
     # Forward pass
