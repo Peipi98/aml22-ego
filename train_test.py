@@ -26,11 +26,11 @@ def main():
 
     val_loader = dataloader('test')
 
-    train(train_loader, optimizer, action_classifier, criterion , 30)
+    train(train_loader, optimizer, action_classifier, criterion , 30, device)
     
     return
 
-def train(dataloader, optimizer, classifier, criterion, num_epochs):
+def train(dataloader, optimizer, classifier, criterion, num_epochs, device):
     for epoch in range(num_epochs):
         batch_time = AverageMeter()
         data_time = AverageMeter()
@@ -45,7 +45,7 @@ def train(dataloader, optimizer, classifier, criterion, num_epochs):
         for i, (input, target) in enumerate(dataloader):
             data_time.update(time.time() - end)
 
-            # target = target.cuda(async=True)
+            #target = target.cuda(True)
             input = input.reshape((1, input.shape[0], input.shape[1]))
             
             print(input)
@@ -53,11 +53,14 @@ def train(dataloader, optimizer, classifier, criterion, num_epochs):
             print(target)
             #print(target.shape)
             input_var = torch.Tensor(input)
-            target_var = torch.Tensor(np.array(target))
+            target_var = torch.Tensor(np.array([target], dtype=np.int64))
             print(input_var)
             print(input_var.shape)
             print(target_var)
             print(target_var.shape)
+            input_var = input_var.to(device)
+            target_var = target_var.to(device)
+
             
             # compute output
             output = classifier(input_var)
