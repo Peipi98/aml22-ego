@@ -12,7 +12,7 @@ import torch.nn.parallel
 import torch.optim
 
 
-SAMPLING = 'dense'
+SAMPLING = 'uniform'
 TYPE = 'train'
 N_FRAMES = 5
 
@@ -20,15 +20,89 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     action_classifier = Classifier(1024, 512, 8)
     action_classifier = load_on_gpu(action_classifier, device)
+    action_classifier.load_state_dict(torch.load('saved_classifiers/classifier_test0.pt'))
     optimizer = torch.optim.SGD(action_classifier.parameters(), lr=0.001, momentum=0.9)
     criterion = torch.nn.CrossEntropyLoss()
-    train_loader = dataloader('train')
+    #train_loader = dataloader('train')
 
     val_loader = dataloader('test')
 
-    train(train_loader, optimizer, action_classifier, criterion , 30, device)
+    #train(train_loader, optimizer, action_classifier, criterion , 60, device)
+    #eval(action_classifier, val_loader, device)
+    eval_peppe(action_classifier, val_loader, criterion, device)
+
+def eval(classifier, val_dataloader, device):
+    classifier.eval()
     
-    return
+    with torch.no_grad():
+        correct = 0
+        total = 0
+        for input, target in val_dataloader:
+            input = input.reshape((1, input.shape[0], input.shape[1]))
+            input = torch.Tensor(input)
+            target = np.array([target])
+            target = target.reshape((1, target.shape[0]))
+            target = torch.LongTensor(target)
+            input = input.to(device)
+            target = target.to(device)
+
+            output = classifier(input)
+            _, predicted = torch.max(output.data,1)
+            total += target.size(0)
+            correct += (predicted == target).sum().item()
+        accuracy = 100 * correct / total
+        print(accuracy)
+
+def eval_peppe(classifier, val_dataloader, criterion, device):
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+    top1 = AverageMeter()
+    top5 = AverageMeter()
+
+    end = time.time()
+    classifier.eval()
+    for i, (input, target) in enumerate(val_dataloader):
+        data_time.update(time.time() - end)
+        input = input.reshape((1, input.shape[0], input.shape[1]))
+
+        input_var = torch.Tensor(input)
+
+        target_var = np.array([target])
+        target_var = target_var.reshape((1, target_var.shape[0]))
+        target_var = torch.LongTensor(target_var)
+
+        input_var = input_var.to(device)
+        target_var = target_var.to(device)
+
+        
+        # compute output
+        output = classifier(input_var)
+        loss = criterion(output, target_var[0])
+        prec1, prec5 = accuracy(output.data, target_var, topk=(1,5))
+
+        losses.update(loss.data, input_var.size(0))
+        top1.update(prec1, input_var.size(0))
+        top5.update(prec5, input_var.size(0))
+
+        # measure elapsed time
+        batch_time.update(time.time() - end)
+        end = time.time()
+        '''
+        if i % args.print_freq == 0:
+            print(('Test: [{0}/{1}]\t'
+                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                    'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                    'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+                    'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                    i, len(val_dataloader), batch_time=batch_time, loss=losses,
+                    top1=top1, top5=top5)))
+        '''
+    print(('Testing Results: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Loss {loss.avg:.5f}'
+            .format(top1=top1, top5=top5, loss=losses)))
+
+    return top1.avg
+
 
 def train(dataloader, optimizer, classifier, criterion, num_epochs, device):
     for epoch in range(num_epochs):
@@ -45,32 +119,29 @@ def train(dataloader, optimizer, classifier, criterion, num_epochs, device):
         for i, (input, target) in enumerate(dataloader):
             data_time.update(time.time() - end)
 
-            #target = target.cuda(True)
-            input = input.reshape((1, input.shape[0], input.shape[1]))
             
-            print(input)
-            print(input.shape)
-            print(target)
-            #print(target.shape)
+            input = input.reshape((1, input.shape[0], input.shape[1]))
+
             input_var = torch.Tensor(input)
-            target_var = torch.Tensor(np.array([target], dtype=np.int64))
-            print(input_var)
-            print(input_var.shape)
-            print(target_var)
-            print(target_var.shape)
+
+            target_var = np.array([target])
+            target_var = target_var.reshape((1, target_var.shape[0]))
+            target_var = torch.LongTensor(target_var)
+
             input_var = input_var.to(device)
             target_var = target_var.to(device)
 
             
             # compute output
             output = classifier(input_var)
-            loss = criterion(output, target_var)
-            
+            loss = criterion(output, target_var[0])
+            #print(output.data)
+            #print(target)
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(output.data, target, topk=(1,5))
-            losses.update(loss.data[0], input.size(0))
-            top1.update(prec1[0], input.size(0))
-            top5.update(prec5[0], input.size(0))
+            prec1, prec5 = accuracy(output.data, target_var, topk=(1,5))
+            losses.update(loss.data, input_var.size(0))
+            top1.update(prec1, input_var.size(0))
+            top5.update(prec5, input_var.size(0))
 
             # compute gradient and do SGD step
             optimizer.zero_grad()
@@ -89,19 +160,11 @@ def train(dataloader, optimizer, classifier, criterion, num_epochs, device):
                   'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
                    epoch, i, len(dataloader), batch_time=batch_time,
                    data_time=data_time, loss=losses, top1=top1, top5=top5, lr=optimizer.param_groups[-1]['lr'])))
+
+        torch.save(classifier.state_dict(), 'saved_classifiers/classifier_test0.pt')
     return 
 
-def eval(classifier, val_dataloader):
-    with torch.no_grad():
-        correct = 0
-        total = 0
-        for input, target in val_dataloader:
-            output = classifier(input)
-            _, predicted = torch.max(output.data,1)
-            total += target.size(0)
-            correct += (predicted == target).sum().item()
-        accuracy = 100 * correct / total
-        print(accuracy)
+
         
 
 def dataloader(type):

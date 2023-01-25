@@ -8,6 +8,7 @@ class Classifier(nn.Module):
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, num_classes)
         self.relu = relu
+        self.softmax = nn.Softmax(dim = 1)
 
     def forward(self, x):
         x = torch.permute(x, (0, 2, 1))
@@ -15,6 +16,7 @@ class Classifier(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
+        x = self.softmax(x)
         return x
 
 '''
