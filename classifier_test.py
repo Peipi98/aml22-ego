@@ -16,7 +16,7 @@ class Classifier(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
-        x = self.softmax(x)
+        #x = self.softmax(x)
         return x
 
 '''
