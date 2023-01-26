@@ -1,9 +1,13 @@
 from torch import nn, relu
 import torch
+from abc import ABC
+from tasks import ActionRecognition
 
-class Classifier(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes):
-        super(Classifier, self).__init__()
+class Classifier(ActionRecognition, ABC):
+    def __init__(self, input_size, hidden_size, name, task_models, batch_size, total_batch, models_dir, num_classes,
+                 num_clips, model_args, args, **kwargs):
+        super().__init__(self, name, task_models, batch_size, total_batch, models_dir, num_classes,
+                 num_clips, model_args, args, **kwargs)
         self.aggregation = nn.AdaptiveAvgPool1d(1)
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, num_classes)

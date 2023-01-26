@@ -13,6 +13,7 @@ import os
 import models as model_list
 import tasks
 import wandb
+from classifier_test import Classifier
 
 # global variables among training functions
 training_iterations = 0
@@ -59,9 +60,14 @@ def main():
         models[m] = getattr(model_list, args.models[m].model)()
 
     # the models are wrapped into the ActionRecognition task which manages all the training steps
+    action_classifier = Classifier(5120, 512, "custom-classifier", models, 
+                                                args.total_batch, args.models_dir, num_classes,
+                                                args.train.num_clips, args.models, args=args)
+    '''
     action_classifier = tasks.ActionRecognition("action-classifier", models, args.batch_size,
                                                 args.total_batch, args.models_dir, num_classes,
                                                 args.train.num_clips, args.models, args=args)
+                                                '''
     action_classifier.load_on_gpu(device)
 
     if args.action == "train":
