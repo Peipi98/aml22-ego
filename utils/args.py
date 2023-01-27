@@ -20,6 +20,9 @@ def add_paths():
         path_conf.dataset.RGB.data_path = "/data/EpicKitchen/EpicKitchenDA/rgb_flow"
         # path_conf.models_dir = "/data/mirco/RAL_EdgeEgoModels/"
         path_conf.models_dir = "/data/mirco/CVPR_AffordanceDA/"
+    else:
+        path_conf.wandb_dir = None
+        path_conf.dataset.RGB.data_path = None
     return path_conf
 
 
