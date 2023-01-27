@@ -18,6 +18,6 @@ class Classifier2(nn.Module):
         x = self.relu(self.fc1(x))
         x = self.fc2(x)
         #x = self.softmax(x)
-        return x
+        return x, None
 
 
