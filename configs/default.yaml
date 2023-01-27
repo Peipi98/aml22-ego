@@ -35,7 +35,7 @@ dataset:
   RGB:
     data_path: ??? # path to RGB data
     tmpl: "img_{:010d}.jpg" # format of RGB filenames
-    features_name: test_feat_kinetics
+    features_name: I3D_EK_dense_5
   Event: # not neeeded for the project
     rgb4e: 6
 

@@ -2,7 +2,7 @@ import os
 import pickle as pk
 import numpy as np
 import torch
-from classifier_test import Classifier
+from models.Classifier import Classifier
 import time
 from datetime import datetime
 from statistics import mean
