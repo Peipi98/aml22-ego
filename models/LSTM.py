@@ -2,13 +2,17 @@ from torch import nn, relu
 import torch
 
 class LSTMClassifier(nn.Module):
-    def __init__(self, input_size=1024, hidden_size=128, num_layers=2, num_classes=8):
+    def __init__(self, num_classes=8):
         super(LSTMClassifier ,self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, num_classes)
+        self.lstm = nn.LSTM(input_size=1024, hidden_size=256, num_layers=3)
+        self.fc1 = nn.Linear(256, 128)
+        self.fc2 = nn.Linear(128, num_classes)
         
 
     def forward(self, x):
-        out, _ = self.lstm(x)
-        out = self.fc(out[:, -1, :])
-        return out, None
+        for t in range(x.size(1)):
+            out, hidden = self.lstm(x[:,t,:].unsqueeze(1), hidden) 
+        x = self.fc(out[:, -1, :])
+        x = relu(x)
+        x = self.fc2(x)
+        return x, None
