@@ -25,6 +25,7 @@ def init_operations():
     """
     parse all the arguments, generate the logger, check gpus to be used and wandb
     """
+    print(args)
     logger.info("Running with parameters: " + pformat_dict(args, indent=1))
 
     # this is needed for multi-GPUs systems where you just want to use a predefined set of GPUs
@@ -56,6 +57,8 @@ def main():
         logger.info('{} Net\tModality: {}'.format(args.models[m].model, m))
         # notice that here, the first parameter passed is the input dimension
         # In our case it represents the feature dimensionality which is equivalent to 1024 for I3D
+        print(modalities)
+        print(args.models)
         models[m] = getattr(model_list, args.models[m].model)()
 
     # the models are wrapped into the ActionRecognition task which manages all the training steps
@@ -64,10 +67,11 @@ def main():
                                                 args.train.num_clips, args.models, args=args)
     action_classifier.load_on_gpu(device)
 
+    print(args.action)
     if args.action == "train":
         # resume_from argument is adopted in case of restoring from a checkpoint
-        if args.resume_from is not None:
-            action_classifier.load_last_model(args.resume_from)
+        #if args.resume_from is not None:
+        #    action_classifier.load_last_model(args.resume_from)
         # define number of iterations I'll do with the actual batch: we do not reason with epochs but with iterations
         # i.e. number of batches passed
         # notice, here it is multiplied by tot_batch/batch_size since gradient accumulation technique is adopted

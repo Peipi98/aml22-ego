@@ -20,6 +20,9 @@ def add_paths():
         path_conf.dataset.RGB.data_path = "/data/EpicKitchen/EpicKitchenDA/rgb_flow"
         # path_conf.models_dir = "/data/mirco/RAL_EdgeEgoModels/"
         path_conf.models_dir = "/data/mirco/CVPR_AffordanceDA/"
+    if platform.node() == "callisto":
+        path_conf.wandb_dir = None # I have no idea what this is
+        path_conf.dataset.RGB.data_path = "/home/h4r/Desktop/advanced-machine-learning/project/code/aml22-ego/Data/Epic_Kitchens_reduced"
     else:
         path_conf.wandb_dir = None
         path_conf.dataset.RGB.data_path = None
