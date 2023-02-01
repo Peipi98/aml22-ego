@@ -1,6 +1,7 @@
 from torch import nn, relu
 import torch.nn.functional as F
 import torch
+import numpy as np
 
 class LSTMClassifier(nn.Module):
     def __init__(self, num_classes=8):
@@ -12,9 +13,12 @@ class LSTMClassifier(nn.Module):
 
     def forward(self, x):
         hidden = None
+        y = []
         for t in range(x.size(1)):
             out, hidden = self.lstm(x[:,t,:].unsqueeze(1), hidden) 
-        x = self.fc(out[:, -1, :])
-        x = F.relu(x)
-        x = self.fc2(x)
+            out = self.fc(out[:, -1, :])
+            out = F.relu(out)
+            y.append(self.fc2(out))
+        x = torch.Tensor(np.array(y))
+        x = torch.avg(x, dim=0)
         return x, None
