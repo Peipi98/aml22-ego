@@ -1,4 +1,5 @@
 from torch import nn, relu
+import torch.nn.functional as F
 import torch
 
 class LSTMClassifier(nn.Module):
@@ -10,9 +11,10 @@ class LSTMClassifier(nn.Module):
         
 
     def forward(self, x):
+        hidden = None
         for t in range(x.size(1)):
             out, hidden = self.lstm(x[:,t,:].unsqueeze(1), hidden) 
         x = self.fc(out[:, -1, :])
-        x = relu(x)
+        x = F.relu(x)
         x = self.fc2(x)
         return x, None
