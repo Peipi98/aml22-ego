@@ -105,69 +105,6 @@ activities_renamed = {
   'Get/replace items from refrigerator/cabinets/drawers': ['Get items from refrigerator/cabinets/drawers'],
 }
 
-def load_data(filename):
-    directory = os.path.join(script_dir, f"./Data/ActionNet/ActionNet-EMG/{filename}")
-    emg_data = pd.read_pickle(directory)
-    return emg_data
-
-
-#TEST PER UN SOGGETTO
-emg = load_data("S04_1.pkl")
-#Subject structure:
-#myo-right: readings + timestamps | data + time_s 
-#myo-left:  readings + timestamps | data + time_s
-#start: start label time
-#stop: stop label time
-#description: label
-
-#dictionary[subject][myo-arm][data]
-#dictionary[subject][myo-arm][time_s]
-
-# We need three nested dictionaries
-# First level: subject
-# Second level: myo-arm
-# Third level: myo-arm-content
-# INPUT: expirements
-# DESIRED OUTPUT: 100x16 matricies for each example.
-# To do that we need to preprocess the data and then 
-# We have to concatenete the 2 100x8 matricies.
-# Each sequence has to be labeled with the start and stop timestamps.
-# So we can make a dictionary like this:
-# dictionary[subject][(Matrix, label)]
-
-
-emg_annotations = pd.read_pickle('./action-net/ActionNet_train.pkl')
-'''
-print(emg_annotations.keys())
-print(emg_annotations.query("file == 'S04_1.pkl'")[['index','file']].head(5))
-'''
-
-def data_loader(emg_ann):
-    #['index', 'file', 'description', 'labels']
-    #print(data_bySubject)
-
-    distinct_files = list(map(lambda x: x.split('.')[0].split('_'),emg_ann['file'].unique()))
-    data_bySubject = dict()
-
-    for file in distinct_files:
-        subject_id, video = file
-        file_name = f'{subject_id}_{video}.pkl'
-    
-        df_curr_file = emg_ann.query(f"file == '{file_name}'")
-        
-        indexes = sorted(list(df_curr_file['index']))
-        data_byKey = load_data(file_name).loc[indexes]
-
-        if subject_id not in data_bySubject or video not in data_bySubject[subject_id]:
-            data_bySubject[subject_id] = dict()
-        data_bySubject[subject_id][video] = data_byKey
-
-    return data_bySubject
-
-
-emg_data = data_loader(emg_annotations)
-print(emg_data)
-
 # Define segmentation parameters.
 resampled_Fs = 10 # define a resampling rate for all sensors to interpolate
 num_segments_per_subject = 20
