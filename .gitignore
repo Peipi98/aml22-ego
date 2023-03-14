@@ -84,6 +84,8 @@ celerybeat-schedule
 # virtualenv
 venv/
 ENV/
+poetry.lock
+pyproject.toml
 
 # Spyder project settings
 .spyderproject
