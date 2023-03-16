@@ -32,12 +32,12 @@ import pickle as pk
 from collections import OrderedDict
 import os, glob
 script_dir = os.path.dirname(os.path.realpath(__file__))
-
+'''
 from helpers import *
 from utils.print_utils import *
 from utils.dict_utils import *
 from utils.time_utils import *
-
+'''
 #######################################
 ############ CONFIGURATION ############
 #######################################
@@ -55,55 +55,6 @@ device_streams_for_features = [
   ('myo-right', 'emg', lambda data: data)
 ]
 
-# Specify the input data.
-emg_annotations = pd.read_pickle("./ActionNet_train.pkl")
-
-data_root_dir = os.path.join(script_dir, './Data/ActionNet/ActionNet-EMG/')
-data_folders_bySubject = OrderedDict([
-  ('S00', data_root_dir),
-  ('S01', data_root_dir),
-  ('S02', data_root_dir),
-  ('S03', data_root_dir),
-  ('S04', data_root_dir),
-  ('S05', data_root_dir),
-  ('S06', data_root_dir),
-  ('S07', data_root_dir),
-  ('S08', data_root_dir),
-  ('S09', data_root_dir),
-])
-
-# Specify the labels to include.  These should match the labels in the HDF5 files.
-baseline_label = 'None'
-activities_to_classify = [
-  baseline_label,
-  'Get/replace items from refrigerator/cabinets/drawers',
-  'Peel a cucumber',
-  'Clear cutting board',
-  'Slice a cucumber',
-  'Peel a potato',
-  'Slice a potato',
-  'Slice bread',
-  'Spread almond butter on a bread slice',
-  'Spread jelly on a bread slice',
-  'Open/close a jar of almond butter',
-  'Pour water from a pitcher into a glass',
-  'Clean a plate with a sponge',
-  'Clean a plate with a towel',
-  'Clean a pan with a sponge',
-  'Clean a pan with a towel',
-  'Get items from cabinets: 3 each large/small plates, bowls, mugs, glasses, sets of utensils',
-  'Set table: 3 each large/small plates, bowls, mugs, glasses, sets of utensils',
-  'Stack on table: 3 each large/small plates, bowls',
-  'Load dishwasher: 3 each large/small plates, bowls, mugs, glasses, sets of utensils',
-  'Unload dishwasher: 3 each large/small plates, bowls, mugs, glasses, sets of utensils',
-  ]
-baseline_index = activities_to_classify.index(baseline_label)
-# Some older experiments may have had different labels.
-#  Each entry below maps the new name to a list of possible old names.
-activities_renamed = {
-  'Open/close a jar of almond butter': ['Open a jar of almond butter'],
-  'Get/replace items from refrigerator/cabinets/drawers': ['Get items from refrigerator/cabinets/drawers'],
-}
 
 def load_data(filename):
     directory = os.path.join(script_dir, f"./Data/ActionNet/ActionNet-EMG/{filename}")
@@ -136,7 +87,7 @@ emg = load_data("S04_1.pkl")
 # dictionary[subject][(Matrix, label)]
 
 
-emg_annotations = pd.read_pickle('./action-net/ActionNet_train.pkl')
+emg_annotations = pd.read_pickle(os.path.join(script_dir,'./action-net/ActionNet_train.pkl'))
 '''
 print(emg_annotations.keys())
 print(emg_annotations.query("file == 'S04_1.pkl'")[['index','file']].head(5))
@@ -155,7 +106,7 @@ def data_loader(emg_ann):
     
         df_curr_file = emg_ann.query(f"file == '{file_name}'")
         
-        indexes = sorted(list(df_curr_file['index']))
+        indexes = list(df_curr_file['index'])
         data_byKey = load_data(file_name).loc[indexes]
 
         if subject_id not in data_bySubject or video not in data_bySubject[subject_id]:

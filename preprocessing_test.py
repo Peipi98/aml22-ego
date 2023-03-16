@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 import pickle
 from collections import OrderedDict
 import os, glob
-import torch
+
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
 ##############################
