@@ -20,6 +20,20 @@ spectrogram = T.Spectrogram(
     normalized=True
 )
 
+mel_spectrogram = T.MelSpectrogram(
+    n_mels=5,
+    sample_rate=160,
+    n_fft=n_fft,
+    win_length=win_length,
+    hop_length=hop_length,
+    center=True,
+    pad_mode="reflect",
+    power=2.0,
+    normalized=True,
+    f_min=0,
+    f_max=80
+)
+
 dict_labels = {
     "Get/replace items from refrigerator/cabinets/drawers": 0,
     "Peel a cucumber" : 1,
@@ -109,7 +123,7 @@ def normalize_tensor(tensor):
 def get_absolute_tensor(signal):
     return torch.abs(signal)
 
-def extract_complete_spectrogram(filename):
+def extract_complete_spectrogram_sequential(filename):
     L = []
     R = []
     labels_L = []
@@ -120,7 +134,7 @@ def extract_complete_spectrogram(filename):
     annotations = pd.read_pickle(filename)
 
     b, a = sp.signal.iirfilter(4, Wn=5.0, fs=160, btype="low", ftype="butter")
-
+    mel_spectrogram.double()
     print("\nExtracting spectrograms...")
     for i in range(1, len(annotations)):
         signal_left = torch.from_numpy(annotations.iloc[i].myo_left_readings).float()
@@ -135,8 +149,8 @@ def extract_complete_spectrogram(filename):
             filtered_right = sp.signal.lfilter(b, a, get_absolute_tensor(signal_right[:, j]))
             filtered_left = normalize_tensor(filtered_left)
             filtered_right = normalize_tensor(filtered_right)
-            filtered_left = spectrogram(torch.from_numpy(filtered_left.numpy()))
-            filtered_right = spectrogram(torch.from_numpy(filtered_right.numpy()))
+            filtered_left = mel_spectrogram(torch.from_numpy(filtered_left.numpy()))
+            filtered_right = mel_spectrogram(torch.from_numpy(filtered_right.numpy()))
 
             temp_L.append(filtered_left)
             temp_R.append(filtered_right)
@@ -167,9 +181,15 @@ def extract_complete_spectrogram(filename):
 
     return L, R, labels
 
-L, R, labels = extract_complete_spectrogram('./Data/ActionNet/ActionNet-EMG/S04_1.pkl')
+def extract_complete_spectrogram_stack(filename):
+    #TODO:
 
-print("LESSS GOOOOOO")
+
+L, R, labels = extract_complete_spectrogram_sequential('./Data/ActionNet/ActionNet-EMG/S04_1.pkl')
+
+print(L[0].shape)
+print(R[0].shape)
+print(len(labels))
 
 # Data preprocessing
 # load and preprocess your spectrogram data
