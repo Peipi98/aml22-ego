@@ -21,7 +21,7 @@ spectrogram = T.Spectrogram(
 )
 
 mel_spectrogram = T.MelSpectrogram(
-    n_mels=5,
+    n_mels=10,
     sample_rate=160,
     n_fft=n_fft,
     win_length=win_length,
@@ -182,14 +182,68 @@ def extract_complete_spectrogram_sequential(filename):
     return L, R, labels
 
 def extract_complete_spectrogram_stack(filename):
-    #TODO:
+    L = []
+    R = []
+    labels_L = []
+    labels_R = []
+    labels = []
+    annotations_spectrograms_L = []
+    annotations_spectrograms_R = []
+
+    first = True
+    annotations = pd.read_pickle(filename)
+
+    b, a = sp.signal.iirfilter(4, Wn=5.0, fs=160, btype="low", ftype="butter")
+    mel_spectrogram.double()
+    print("\nExtracting spectrograms...")
+    for i in range(1, len(annotations)):
+        signal_left = torch.from_numpy(annotations.iloc[i].myo_left_readings).float()
+        signal_right = torch.from_numpy(annotations.iloc[i].myo_right_readings).float()
+
+        temp_L = []
+        temp_R = []
+        temp_size_L = 0
+        temp_size_R = 0
+        for j in range(8):
+            filtered_left = sp.signal.lfilter(b, a, get_absolute_tensor(signal_left[:, j]))
+            filtered_right = sp.signal.lfilter(b, a, get_absolute_tensor(signal_right[:, j]))
+            filtered_left = normalize_tensor(filtered_left)
+            filtered_right = normalize_tensor(filtered_right)
+            filtered_left = mel_spectrogram(torch.from_numpy(filtered_left.numpy()))
+            filtered_right = mel_spectrogram(torch.from_numpy(filtered_right.numpy()))
+
+            if first:
+                temp_L = filtered_left[None,:,:]
+                temp_R = filtered_right[None,:,:]
+            else:
+                temp_L = torch.cat((temp_L, filtered_left[None,:,:]), 0)
+                temp_R = torch.cat((temp_R, filtered_right[None,:,:]), 0)
+
+            first = False
+
+        temp_size_L = filtered_left.shape[1]
+        temp_size_R = filtered_right.shape[1]
+        
+        for _ in range(temp_size_L):
+            labels_L.append(dict_labels[annotations.iloc[i].description])
+
+        for _ in range(temp_size_R):
+            labels_R.append(dict_labels[annotations.iloc[i].description])
 
 
-L, R, labels = extract_complete_spectrogram_sequential('./Data/ActionNet/ActionNet-EMG/S04_1.pkl')
+        annotations_spectrograms_L.append(temp_L)
+        annotations_spectrograms_R.append(temp_R)
+        first = True
+    
+    if len(labels_L) > len(labels_R):
+        labels = labels_L
+    else:
+        labels = labels_R
 
-print(L[0].shape)
-print(R[0].shape)
-print(len(labels))
+    return annotations_spectrograms_L, annotations_spectrograms_R, labels
+
+
+L, R, labels = extract_complete_spectrogram_stack('./Data/ActionNet/ActionNet-EMG/S05_2.pkl')
 
 # Data preprocessing
 # load and preprocess your spectrogram data
