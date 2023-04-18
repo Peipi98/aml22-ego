@@ -16,9 +16,48 @@ def load_data(filename):
     emg_data = pd.read_pickle(f"./Data/ActionNet/ActionNet-EMG/{filename}")
     return emg_data
 
+def data_loader(emg_ann):
+    '''
+    Retrieve data from emg_annotations file (train or test).
+    Then it loads each experiment in the dictionary 'data_bySubject'
+    starting from their header:
+
+    `['index', 'file', 'description', 'labels']`
+
+    data_bySubject[subject_id][video] contains the entire dataframe for
+    that specific experiment, whom have the following header:
+
+    `['description', 'start', 'stop', 'myo_left_timestamps', 'myo_left_readings',
+    'myo_right_timestamps', 'myo_right_readings']`
+
+    '''
+    #['index', 'file', 'description', 'labels']
+    #print(data_bySubject)
+
+    distinct_files = list(map(lambda x: x.split('.')[0].split('_'), emg_ann['file'].unique()))
+    data_bySubject = dict()
+
+    for file in distinct_files:
+        subject_id, video = file
+        file_name = f'{subject_id}_{video}.pkl'
+    
+        df_curr_file = emg_ann.query(f"file == '{file_name}'")
+        
+        indexes = list(df_curr_file['index'])
+        data_byKey = load_data(file_name).loc[indexes]
+
+        if subject_id not in data_bySubject:
+            data_bySubject[subject_id] = dict()
+        data_bySubject[subject_id][video] = data_byKey
+
+    return data_bySubject
 
 #TEST PER UN SOGGETTO
-emg = load_data("S04_1.pkl")
+# emg = load_data("S04_1.pkl")
+emg_annotations = pd.read_pickle(os.path.join(script_dir,'./action-net/ActionNet_train.pkl'))
+emg = data_loader(emg_annotations)
+
+print(emg['S02']['4'].keys())
 #Subject structure:
 #myo-right: readings + timestamps | data + time_s 
 #myo-left:  readings + timestamps | data + time_s
@@ -41,7 +80,7 @@ emg = load_data("S04_1.pkl")
 # So we can make a dictionary like this:
 # dictionary[subject][(Matrix, label)]
 
-emg_annotations = pd.read_pickle('./action-net/ActionNet_train.pkl')
+#emg_annotations = pd.read_pickle('./action-net/ActionNet_train.pkl')
 
 print(emg.keys())
 
@@ -75,23 +114,25 @@ def lowpass_filter(data, cutoff, Fs, order=5):
 
 data_dict = {"myo_right_readings": [], "myo_left_timestamps": [], "myo_right_timestamps": [], "myo_left_readings": []}
 
-for key in ['myo_right', 'myo_left']:
-    for i in range(60):
-        if i == 0:
-            #calibration
-            continue
-        data = abs(emg[key + '_readings'][i])
-        t =  emg[key + '_timestamps'][i]
-        Fs = (t.size -1) / (t[-1] - t[0])
-        y =  lowpass_filter(data, 5, Fs)
-        # Normalization
-        y = y / ((np.amax(y) - np.amin(y))/2)
-        # Jointly shift the baseline to -1 instead of 0.
-        y = y - np.amin(y) - 1
-        emg[key + '_readings'][i] = y 
-        emg[key + '_timestamps'][i] = t
-        #data_dict[key + '_readings'].append(y)
-        #data_dict[key + '_timestamps'].append(t)
+for (subject_id, content) in emg.items():
+    for (video, df) in content.items():
+        for key in ['myo_right', 'myo_left']:
+            for i, _ in df.iterrows():
+                if i == 0:
+                    #calibration
+                    continue
+                data = abs(emg[subject_id][video][key + '_readings'][i])
+                t =  emg[subject_id][video][key + '_timestamps'][i]
+                Fs = (t.size -1) / (t[-1] - t[0])
+                y =  lowpass_filter(data, 5, Fs)
+                # Normalization
+                y = y / ((np.amax(y) - np.amin(y))/2)
+                # Jointly shift the baseline to -1 instead of 0.
+                y = y - np.amin(y) - 1
+                emg[subject_id][video][key + '_readings'][i] = y 
+                emg[subject_id][video][key + '_timestamps'][i] = t
+                #data_dict[key + '_readings'].append(y)
+                #data_dict[key + '_timestamps'].append(t)
 
 #########
 #RESAMPLE
@@ -104,6 +145,14 @@ for key in ['myo_right', 'myo_left']:
 #It can happen that some timestamps doens't have any reading
 #In this case we convert "NaN" into 0.
 
+for (subject_id, content) in emg.items():
+    for (video, df) in content.items():
+        for key in ['myo_right', 'myo_left']:
+            for i, _ in df.iterrows():
+                if i == 0:
+                    #calibration
+                    continue
+                
 
 #data1 = np.squeeze(np.array(data_dict['myo_right_readings'][1]))
 data1 = np.squeeze(np.array(emg['myo_right_readings'][1]))
