@@ -129,11 +129,10 @@ for (subject_id, content) in emg.items():
                 y = y / ((np.amax(y) - np.amin(y))/2)
                 # Jointly shift the baseline to -1 instead of 0.
                 y = y - np.amin(y) - 1
-                emg[subject_id][video][key + '_readings'][i] = y 
-                emg[subject_id][video][key + '_timestamps'][i] = t
+                emg[subject_id][video].at[i, key + '_readings'] = y 
+                emg[subject_id][video].at[i, key + '_timestamps'] = t
                 #data_dict[key + '_readings'].append(y)
                 #data_dict[key + '_timestamps'].append(t)
-
 #########
 #RESAMPLE
 #########
@@ -152,39 +151,40 @@ for (subject_id, content) in emg.items():
                 if i == 0:
                     #calibration
                     continue
-                
+                #data1 = np.squeeze(np.array(data_dict['myo_right_readings'][1]))
+                data1 = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_readings']))
+                print(f'data: ', data1.shape)
+                #time_s = np.squeeze(np.array(data_dict['myo_right_timestamps'][1]))
+                time_s = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_timestamps']))
 
-#data1 = np.squeeze(np.array(data_dict['myo_right_readings'][1]))
-data1 = np.squeeze(np.array(emg['myo_right_readings'][1]))
-#time_s = np.squeeze(np.array(data_dict['myo_right_timestamps'][1]))
-time_s = np.squeeze(np.array(emg['myo_right_timestamps'][1]))
-target_time_s = np.linspace(time_s[0], time_s[-1],
-                                  num=int(round(1+resampled_Fs*(time_s[-1] - time_s[0]))),
-                                  endpoint=True)
-fn_interpolate = interpolate.interp1d(
-          time_s, # x values
-          data1,   # y values
-          axis=0,              # axis of the data along which to interpolate
-          kind='linear',       # interpolation method, such as 'linear', 'zero', 'nearest', 'quadratic', 'cubic', etc.
-          fill_value='extrapolate' # how to handle x values outside the original range
-      )
+                target_time_s = np.linspace(time_s[0], time_s[-1],
+                                                num=int(round(1+resampled_Fs*(time_s[-1] - time_s[0]))),
+                                                endpoint=True)
+                fn_interpolate = interpolate.interp1d(
+                        time_s, # x values
+                        data1,   # y values
+                        axis=0,              # axis of the data along which to interpolate
+                        kind='linear',       # interpolation method, such as 'linear', 'zero', 'nearest', 'quadratic', 'cubic', etc.
+                        fill_value='extrapolate' # how to handle x values outside the original range
+                    )
 
-data_resampled = fn_interpolate(target_time_s)
-if np.any(np.isnan(data_resampled)):
-        print('\n'*5)
-        print('='*50)
-        print('='*50)
-        print('FOUND NAN')
-        timesteps_have_nan = np.any(np.isnan(data_resampled), axis=tuple(np.arange(1,np.ndim(data_resampled))))
-        print('Timestep indexes with NaN:', np.where(timesteps_have_nan)[0])
-        print('\n'*5)
-        data_resampled[np.isnan(data_resampled)] = 0
-#print((time_s.size -1) / (time_s[-1] - time_s[0]))
-print(len(data1))
-print(len(data_resampled))
-print(len(emg['myo_right_readings'][1]))
-emg['myo_right_readings'][1] = data_resampled
-emg['myo_right_timestamps'][1] = target_time_s
+                data_resampled = fn_interpolate(target_time_s)
+                if np.any(np.isnan(data_resampled)):
+                        print('\n'*5)
+                        print('='*50)
+                        print('='*50)
+                        print('FOUND NAN')
+                        timesteps_have_nan = np.any(np.isnan(data_resampled), axis=tuple(np.arange(1,np.ndim(data_resampled))))
+                        print('Timestep indexes with NaN:', np.where(timesteps_have_nan)[0])
+                        print('\n'*5)
+                        data_resampled[np.isnan(data_resampled)] = 0
+                #print((time_s.size -1) / (time_s[-1] - time_s[0]))
+                print(f'{subject_id=} | {video=}')
+                print(len(data1))
+                print(len(data_resampled))
+                print(len(emg[subject_id][video].loc[i, f'{key}_readings']))
+                emg[subject_id][video].at[i, f'{key}_readings'] = data_resampled
+                emg[subject_id][video].at[i, f'{key}_timestamps'] = target_time_s
 #print(emg[['myo_right_readings','myo_right_timestamps']])
 
 '''
@@ -227,52 +227,61 @@ print(data_dict)
 
 #We take one stream of data and we segment it creating a matrix of 100x8 for each arm.
 #We take the resampled data and we create features matricies.
+for (subject_id, content) in emg.items():
+    for (video, df) in content.items():
+        for key in ['myo_right', 'myo_left']:
+            for i, _ in df.iterrows():
+                if i == 0:
+                    #calibration
+                    continue
 
-start= emg['start'][1]
-end = emg['stop'][1]
+                start= emg[subject_id][video].loc[i, 'start']
+                end = emg[subject_id][video].loc[i, 'stop']
 
-#we try to extract 20 segments of 10s at 10Hz (100)
 
-start_time_s = start + 0.5
-end_time_s = end - 0.5
-segment_start_times_s = np.linspace(start_time_s, end_time_s - 10,
-                                        num=20,
-                                        endpoint=True)
-feature_matrices = []
-for segment_start_time_s in segment_start_times_s:
-        # print('Processing segment starting at %f' % segment_start_time_s)
-        segment_end_time_s = segment_start_time_s + 10
-        feature_matrix = np.empty(shape=(100, 0))
-        
-        # print(' Adding data from [%s][%s]' % (device_name, stream_name))
-        data = np.squeeze(np.array(emg['myo_right_readings'][1]))
-        time_s = np.squeeze(np.array(emg['myo_right_timestamps'][1]))
-        time_indexes = np.where((time_s >= segment_start_time_s) & (time_s <= segment_end_time_s))[0]
-        # Expand if needed until the desired segment length is reached.
-        time_indexes = list(time_indexes)
-        while len(time_indexes) < 100:
-            #print(' Increasing segment length from %d to %d for %s %s for segment starting at %f' % (len(time_indexes), 100, device_name, stream_name, segment_start_time_s))
-            if time_indexes[0] > 0:
-                time_indexes = [time_indexes[0]-1] + time_indexes
-            elif time_indexes[-1] < len(time_s)-1:
-                time_indexes.append(time_indexes[-1]+1)
-            else:
-                raise AssertionError
-        while len(time_indexes) > 100:
-            #print(' Decreasing segment length from %d to %d for %s %s for segment starting at %f' % (len(time_indexes), 100, device_name, stream_name, segment_start_time_s))
-            time_indexes.pop()
-        time_indexes = np.array(time_indexes)
-            
-        # Extract the data.
-        time_s = time_s[time_indexes]
-        data = data[time_indexes,:]
-        # print('  Got data of shape', data.shape)
-        feature_matrix = np.concatenate((feature_matrix, data), axis=1)
-        feature_matrices.append(feature_matrix)
 
-print(len(feature_matrices))
-print(len(feature_matrices[0]))
-print(len(feature_matrices[0][0]))
+                #we try to extract 20 segments of 10s at 10Hz (100)
+
+                start_time_s = start + 0.5
+                end_time_s = end - 0.5
+                segment_start_times_s = np.linspace(start_time_s, end_time_s - 10,
+                                                        num=20,
+                                                        endpoint=True)
+                feature_matrices = []
+                for segment_start_time_s in segment_start_times_s:
+                        # print('Processing segment starting at %f' % segment_start_time_s)
+                        segment_end_time_s = segment_start_time_s + 10
+                        feature_matrix = np.empty(shape=(100, 0))
+                        
+                        # print(' Adding data from [%s][%s]' % (device_name, stream_name))
+                        data = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_readings']))
+                        time_s = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_timestamps']))
+                        time_indexes = np.where((time_s >= segment_start_time_s) & (time_s <= segment_end_time_s))[0]
+                        # Expand if needed until the desired segment length is reached.
+                        time_indexes = list(time_indexes)
+                        while len(time_indexes) < 100:
+                            #print(' Increasing segment length from %d to %d for %s %s for segment starting at %f' % (len(time_indexes), 100, device_name, stream_name, segment_start_time_s))
+                            if time_indexes[0] > 0:
+                                time_indexes = [time_indexes[0]-1] + time_indexes
+                            elif time_indexes[-1] < len(time_s)-1:
+                                time_indexes.append(time_indexes[-1]+1)
+                            else:
+                                raise AssertionError
+                        while len(time_indexes) > 100:
+                            #print(' Decreasing segment length from %d to %d for %s %s for segment starting at %f' % (len(time_indexes), 100, device_name, stream_name, segment_start_time_s))
+                            time_indexes.pop()
+                        time_indexes = np.array(time_indexes)
+                            
+                        # Extract the data.
+                        time_s = time_s[time_indexes]
+                        data = data[time_indexes,:]
+                        # print('  Got data of shape', data.shape)
+                        feature_matrix = np.concatenate((feature_matrix, data), axis=1)
+                        feature_matrices.append(feature_matrix)
+
+                        print(len(feature_matrices))
+                        print(len(feature_matrices[0]))
+                        print(len(feature_matrices[0][0]))
 
 def get_feature_matrices(data, start, end, count=20):
     # Determine start/end times for each example segment.
@@ -315,6 +324,7 @@ def get_feature_matrices(data, start, end, count=20):
             feature_matrix = np.concatenate((feature_matrix, data), axis=1)
         feature_matrices.append(feature_matrix)
     return feature_matrices
+
 
 ################
 #EXAMPLES
