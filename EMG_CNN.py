@@ -10,6 +10,8 @@ n_fft = 32
 win_length = None
 hop_length = 4
 
+TIME_CUT = 25
+
 spectrogram = T.Spectrogram(
     n_fft=n_fft,
     win_length=win_length,
@@ -73,17 +75,19 @@ class EMGDataset(Dataset):
 class CNN(nn.Module):
     def __init__(self, num_classes):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3)
-        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3)
-        self.pool = nn.MaxPool2d(kernel_size=2)
-        self.fc1 = nn.Linear(32 * 39 * 5, 128)
-        self.fc2 = nn.Linear(128, num_classes)
+        self.conv1 = nn.Conv2d(in_channels=8, out_channels=128, kernel_size=3)
+        self.conv2 = nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3)
+        self.pool = nn.AvgPool2d(kernel_size=2)
+        self.fc1 = nn.Linear(8256*1*248, 1080)
+        self.fc2 = nn.Linear(1080, num_classes)
         self.dropout = nn.Dropout(p=0.5)
         
     def forward(self, x):
         x = self.pool(torch.relu(self.conv1(x)))
         x = self.pool(torch.relu(self.conv2(x)))
-        x = x.view(-1, 32 * 39 * 5)
+        print(x.shape)
+        x = x.view(-1, 256*1*248 )
+        print(x.shape)
         x = self.dropout(torch.relu(self.fc1(x)))
         x = self.fc2(x)
         return x
@@ -92,6 +96,7 @@ def train(model, train_loader, optimizer, criterion):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         optimizer.zero_grad()
+        print(data.shape)
         output = model(data)
         loss = criterion(output, target)
         loss.backward()
@@ -123,63 +128,15 @@ def normalize_tensor(tensor):
 def get_absolute_tensor(signal):
     return torch.abs(signal)
 
-def extract_complete_spectrogram_sequential(filename):
-    L = []
-    R = []
-    labels_L = []
-    labels_R = []
-    labels = []
-
-    first = True
-    annotations = pd.read_pickle(filename)
-
-    b, a = sp.signal.iirfilter(4, Wn=5.0, fs=160, btype="low", ftype="butter")
-    mel_spectrogram.double()
-    print("\nExtracting spectrograms...")
-    for i in range(1, len(annotations)):
-        signal_left = torch.from_numpy(annotations.iloc[i].myo_left_readings).float()
-        signal_right = torch.from_numpy(annotations.iloc[i].myo_right_readings).float()
-
-        temp_L = []
-        temp_R = []
-        temp_size_L = 0
-        temp_size_R = 0
-        for j in range(8):
-            filtered_left = sp.signal.lfilter(b, a, get_absolute_tensor(signal_left[:, j]))
-            filtered_right = sp.signal.lfilter(b, a, get_absolute_tensor(signal_right[:, j]))
-            filtered_left = normalize_tensor(filtered_left)
-            filtered_right = normalize_tensor(filtered_right)
-            filtered_left = mel_spectrogram(torch.from_numpy(filtered_left.numpy()))
-            filtered_right = mel_spectrogram(torch.from_numpy(filtered_right.numpy()))
-
-            temp_L.append(filtered_left)
-            temp_R.append(filtered_right)
-
-        temp_size_L = filtered_left.shape[1]
-        temp_size_R = filtered_right.shape[1]
-        
-        for _ in range(temp_size_L):
-            labels_L.append(dict_labels[annotations.iloc[i].description])
-
-        for _ in range(temp_size_R):
-            labels_R.append(dict_labels[annotations.iloc[i].description])
-
-        for k in range(8):
-            if first:
-                L.append(temp_L[k])
-                R.append(temp_R[k])                
-            else:
-                L[k] = torch.cat((L[k], temp_L[k]), 1)
-                R[k] = torch.cat((R[k], temp_R[k]), 1)
-
-        first = False
-
-    if len(labels_L) > len(labels_R):
-        labels = labels_L
+def cut_and_pad(signal, sampling_rate, seconds):
+    padded_signal = torch.zeros(sampling_rate * seconds)
+    if signal.shape[0] < sampling_rate * seconds:
+        padded_signal = torch.zeros(sampling_rate * seconds)
+        padded_signal[:signal.shape[0]] = signal
     else:
-        labels = labels_R
+        padded_signal = signal[:sampling_rate * seconds]
 
-    return L, R, labels
+    return padded_signal
 
 def extract_complete_spectrogram_stack(filename):
     L = []
@@ -209,6 +166,8 @@ def extract_complete_spectrogram_stack(filename):
             filtered_right = sp.signal.lfilter(b, a, get_absolute_tensor(signal_right[:, j]))
             filtered_left = normalize_tensor(filtered_left)
             filtered_right = normalize_tensor(filtered_right)
+            filtered_left = cut_and_pad(filtered_left, 160, TIME_CUT)
+            filtered_right = cut_and_pad(filtered_right, 160, TIME_CUT)
             filtered_left = mel_spectrogram(torch.from_numpy(filtered_left.numpy()))
             filtered_right = mel_spectrogram(torch.from_numpy(filtered_right.numpy()))
 
@@ -243,7 +202,11 @@ def extract_complete_spectrogram_stack(filename):
     return annotations_spectrograms_L, annotations_spectrograms_R, labels
 
 
-L, R, labels = extract_complete_spectrogram_stack('./Data/ActionNet/ActionNet-EMG/S05_2.pkl')
+L, R, labels = extract_complete_spectrogram_stack('./Data/ActionNet/ActionNet-EMG/S09_2.pkl')
+print(L[0].shape)
+print(L[59].shape)
+print(len(L))
+
 
 # Data preprocessing
 # load and preprocess your spectrogram data
@@ -254,6 +217,8 @@ L, R, labels = extract_complete_spectrogram_stack('./Data/ActionNet/ActionNet-EM
 train_ratio = 0.6
 val_ratio = 0.2
 test_ratio = 0.2
+
+spectrogram_data = L
 
 num_samples = len(spectrogram_data)
 train_samples = int(train_ratio * num_samples)
@@ -268,7 +233,7 @@ test_data = spectrogram_data[-test_samples:]
 test_labels = labels[-test_samples:]
 
 # Define data loaders
-batch_size = 64
+batch_size = 5
 
 train_dataset = EMGDataset(train_data, train_labels)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -281,6 +246,7 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 # Define the model and optimizer
 model = CNN(num_classes= 20)
+model = model.double()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Define the loss function
