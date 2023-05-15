@@ -154,8 +154,8 @@ for (subject_id, content) in emg.items():
                 if i == 0:
                     #calibration
                     continue
-                data = abs(emg[subject_id][video][key + '_readings'][i])
-                t =  emg[subject_id][video][key + '_timestamps'][i]
+                data = abs(emg[subject_id][video].loc[i, key + '_readings'])
+                t =  emg[subject_id][video].loc[i, key + '_timestamps']
                 Fs = (t.size -1) / (t[-1] - t[0])
                 y =  lowpass_filter(data, 5, Fs)
                 # Normalization
@@ -271,6 +271,8 @@ print(data_dict)
     -   The buffers for `start_time_s` and `end_time_s` are
         commented since the dataset is already cleaned.
 '''
+example_matrices_byLabel = {}
+
 for (subject_id, content) in emg.items():
     for (video, dataframe) in content.items():
         for (label_index, activity_label) in enumerate(activities_to_classify):
@@ -288,9 +290,6 @@ for (subject_id, content) in emg.items():
 
             count_iter = 0
             for i in file_label_indexes:
-                if i == 0:
-                    #calibration
-                    continue
                 
                 start = emg[subject_id][video].loc[i, 'start']
                 end = emg[subject_id][video].loc[i, 'stop']
@@ -331,7 +330,8 @@ for (subject_id, content) in emg.items():
                             else:
                                 # print('time_indexes: ', len(time_indexes))
                                 # print(f'{correct_shape=}')
-                                # correct_shape = False
+                                correct_shape = False
+                                print(segment_end_time_s-segment_start_time_s, time_indexes, len(time_s))
                                 break
                         while len(time_indexes) > 100:
                             # print(' Decreasing segment length from %d to %d for segment starting at %f' % (len(time_indexes), 100, segment_start_time_s))
@@ -341,22 +341,32 @@ for (subject_id, content) in emg.items():
                         # Extract the data.
                         time_s = time_s[time_indexes]
                         data = data[time_indexes,:]
+
+                        # Zero padding over the feature matrices with shape[0] < 100 (ex. (54, 8)->(100, 8))
+                        if not correct_shape:
+                            #[time_indexes.append(len(time_indexes) + _) for _ in range(100-len(time_indexes))]
+                            data = np.pad(data, [(0, 100-data.shape[0]), (0, 0)], mode='constant', constant_values=0)
+                            print(data.shape)
+                        
+                        data = np.reshape(data, (segment_length, -1))
+                        print(data.shape)
                         # print('  Got data of shape', data.shape)
-                        try:
-                            feature_matrix = np.concatenate((feature_matrix, data), axis=1)
-                        except:
-                            correct_shape = False
+                        #try:
+                        feature_matrix = np.concatenate((feature_matrix, data), axis=1)
+                        #except:
+                            #correct_shape = False
                     if correct_shape:
                         feature_matrices.append(feature_matrix)
                     #reset boolean
-
+                correct_shape = True
+                print()
+                example_matrices_byLabel.setdefault(activity_label, [])
+                example_matrices_byLabel[activity_label].extend(feature_matrices)
                 # print(len(feature_matrices))
                 # print(len(feature_matrices[count_iter]))
                 # print(len(feature_matrices[count_iter][0]))
                 # if correct_shape:
                 #     count_iter += 1
-                correct_shape = True
-                print()
 
 sys.stdout.close()
 sys.stdout=stdoutOrigin
