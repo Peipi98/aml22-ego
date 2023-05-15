@@ -6,8 +6,41 @@ from matplotlib import pyplot as plt
 import pickle
 from collections import OrderedDict
 import os, glob
+import sys 
+
+stdoutOrigin=sys.stdout 
+sys.stdout = open("log.txt", "w")
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
+
+activities_to_classify = [
+  'Get/replace items from refrigerator/cabinets/drawers',
+  'Peel a cucumber',
+  'Clear cutting board',
+  'Slice a cucumber',
+  'Peel a potato',
+  'Slice a potato',
+  'Slice bread',
+  'Spread almond butter on a bread slice',
+  'Spread jelly on a bread slice',
+  'Open/close a jar of almond butter',
+  'Pour water from a pitcher into a glass',
+  'Clean a plate with a sponge',
+  'Clean a plate with a towel',
+  'Clean a pan with a sponge',
+  'Clean a pan with a towel',
+  'Get items from cabinets: 3 each large/small plates, bowls, mugs, glasses, sets of utensils',
+  'Set table: 3 each large/small plates, bowls, mugs, glasses, sets of utensils',
+  'Stack on table: 3 each large/small plates, bowls',
+  'Load dishwasher: 3 each large/small plates, bowls, mugs, glasses, sets of utensils',
+  'Unload dishwasher: 3 each large/small plates, bowls, mugs, glasses, sets of utensils',
+  ]
+# Some older experiments may have had different labels.
+#  Each entry below maps the new name to a list of possible old names.
+activities_renamed = {
+  'Open/close a jar of almond butter': ['Open a jar of almond butter'],
+  'Get/replace items from refrigerator/cabinets/drawers': ['Get items from refrigerator/cabinets/drawers'],
+}
 
 ##############################
 #IMPLEMENTARE CARICAMENTO DATI
@@ -153,7 +186,7 @@ for (subject_id, content) in emg.items():
                     continue
                 #data1 = np.squeeze(np.array(data_dict['myo_right_readings'][1]))
                 data1 = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_readings']))
-                print(f'data: ', data1.shape)
+                # print(f'data: ', data1.shape)
                 #time_s = np.squeeze(np.array(data_dict['myo_right_timestamps'][1]))
                 time_s = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_timestamps']))
 
@@ -179,10 +212,10 @@ for (subject_id, content) in emg.items():
                         print('\n'*5)
                         data_resampled[np.isnan(data_resampled)] = 0
                 #print((time_s.size -1) / (time_s[-1] - time_s[0]))
-                print(f'{subject_id=} | {video=}')
-                print(len(data1))
-                print(len(data_resampled))
-                print(len(emg[subject_id][video].loc[i, f'{key}_readings']))
+                # print(f'{subject_id=} | {video=}')
+                # print(len(data1))
+                # print(len(data_resampled))
+                # print(len(emg[subject_id][video].loc[i, f'{key}_readings']))
                 emg[subject_id][video].at[i, f'{key}_readings'] = data_resampled
                 emg[subject_id][video].at[i, f'{key}_timestamps'] = target_time_s
 #print(emg[['myo_right_readings','myo_right_timestamps']])
@@ -227,32 +260,62 @@ print(data_dict)
 
 #We take one stream of data and we segment it creating a matrix of 100x8 for each arm.
 #We take the resampled data and we create features matricies.
+
+'''
+    TEMPORARY:
+    -   Added `correct_shape` boolean to handle the case in which
+        left and right readings don't match the shape 100x16.
+        At the moment there isn't 'raise AssertionError'.
+
+    MODIFICATIONS:
+    -   The buffers for `start_time_s` and `end_time_s` are
+        commented since the dataset is already cleaned.
+'''
 for (subject_id, content) in emg.items():
-    for (video, df) in content.items():
-        for key in ['myo_right', 'myo_left']:
-            for i, _ in df.iterrows():
+    for (video, dataframe) in content.items():
+        for (label_index, activity_label) in enumerate(activities_to_classify):
+            # Extract num_segments_per_subject examples from each instance of the activity.
+            # Then later, will select num_segments_per_subject in total from all instances.
+            activities_labels = dataframe['description'].copy()
+            file_label_indexes = [i for (i, label) in activities_labels.items() if label==activity_label]
+            if len(file_label_indexes) == 0 and activity_label in activities_renamed:
+                for alternate_label in activities_renamed[activity_label]:
+                    file_label_indexes = [i for (i, label) in activities_labels.items() if label==activity_label]
+                    if len(file_label_indexes) > 0:
+                        print('  Found renamed activity from "%s"' % alternate_label)
+                        break
+            print('  Found %d instances of %s' % (len(file_label_indexes), activity_label))
+
+            count_iter = 0
+            for i in file_label_indexes:
                 if i == 0:
                     #calibration
                     continue
-
-                start= emg[subject_id][video].loc[i, 'start']
+                
+                start = emg[subject_id][video].loc[i, 'start']
                 end = emg[subject_id][video].loc[i, 'stop']
 
-
-
                 #we try to extract 20 segments of 10s at 10Hz (100)
+                start_time_s = start #+ 0.5
+                end_time_s = end #- 0.5
+                duration_s = end_time_s - start_time_s
 
-                start_time_s = start + 0.5
-                end_time_s = end - 0.5
-                segment_start_times_s = np.linspace(start_time_s, end_time_s - 10,
-                                                        num=20,
+                # Extract example segments and generate a feature matrix for each one.
+                num_examples = num_segments_per_subject
+                print('  Extracting %d examples from activity "%s" with duration %0.2fs' % (num_examples, activity_label, duration_s))
+                
+                segment_start_times_s = np.linspace(start_time_s, end_time_s - 10.0,
+                                                        num = num_examples,
                                                         endpoint=True)
+                
                 feature_matrices = []
+                correct_shape = True
+
                 for segment_start_time_s in segment_start_times_s:
-                        # print('Processing segment starting at %f' % segment_start_time_s)
-                        segment_end_time_s = segment_start_time_s + 10
-                        feature_matrix = np.empty(shape=(100, 0))
-                        
+                    # print('Processing segment starting at %f' % segment_start_time_s)
+                    segment_end_time_s = segment_start_time_s + 10.0
+                    feature_matrix = np.empty(shape=(100, 0))
+                    for key in ['myo_right', 'myo_left']:
                         # print(' Adding data from [%s][%s]' % (device_name, stream_name))
                         data = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_readings']))
                         time_s = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_timestamps']))
@@ -260,15 +323,18 @@ for (subject_id, content) in emg.items():
                         # Expand if needed until the desired segment length is reached.
                         time_indexes = list(time_indexes)
                         while len(time_indexes) < 100:
-                            #print(' Increasing segment length from %d to %d for %s %s for segment starting at %f' % (len(time_indexes), 100, device_name, stream_name, segment_start_time_s))
+                            # print(' Increasing segment length from %d to %d for segment starting at %f' % (len(time_indexes), 100, segment_start_time_s))
                             if time_indexes[0] > 0:
                                 time_indexes = [time_indexes[0]-1] + time_indexes
                             elif time_indexes[-1] < len(time_s)-1:
                                 time_indexes.append(time_indexes[-1]+1)
                             else:
-                                raise AssertionError
+                                # print('time_indexes: ', len(time_indexes))
+                                # print(f'{correct_shape=}')
+                                # correct_shape = False
+                                break
                         while len(time_indexes) > 100:
-                            #print(' Decreasing segment length from %d to %d for %s %s for segment starting at %f' % (len(time_indexes), 100, device_name, stream_name, segment_start_time_s))
+                            # print(' Decreasing segment length from %d to %d for segment starting at %f' % (len(time_indexes), 100, segment_start_time_s))
                             time_indexes.pop()
                         time_indexes = np.array(time_indexes)
                             
@@ -276,12 +342,24 @@ for (subject_id, content) in emg.items():
                         time_s = time_s[time_indexes]
                         data = data[time_indexes,:]
                         # print('  Got data of shape', data.shape)
-                        feature_matrix = np.concatenate((feature_matrix, data), axis=1)
+                        try:
+                            feature_matrix = np.concatenate((feature_matrix, data), axis=1)
+                        except:
+                            correct_shape = False
+                    if correct_shape:
                         feature_matrices.append(feature_matrix)
+                    #reset boolean
 
-                        print(len(feature_matrices))
-                        print(len(feature_matrices[0]))
-                        print(len(feature_matrices[0][0]))
+                # print(len(feature_matrices))
+                # print(len(feature_matrices[count_iter]))
+                # print(len(feature_matrices[count_iter][0]))
+                # if correct_shape:
+                #     count_iter += 1
+                correct_shape = True
+                print()
+
+sys.stdout.close()
+sys.stdout=stdoutOrigin
 
 def get_feature_matrices(data, start, end, count=20):
     # Determine start/end times for each example segment.
@@ -329,7 +407,10 @@ def get_feature_matrices(data, start, end, count=20):
 ################
 #EXAMPLES
 ################
+
 '''
+
+
 # Will store intermediate examples from each file.
 example_matrices_byLabel = {}
 # Then will create the following 'final' lists with the correct number of examples.
@@ -343,68 +424,57 @@ noActivity_matrices = []
 
 # Get the timestamped label data.
 # As described in the HDF5 metadata, each row has entries for ['Activity', 'Start/Stop', 'Valid', 'Notes'].
-device_name = 'experiment-activities'
-stream_name = 'activities'
-activity_datas = file_data[device_name][stream_name]['data']
-activity_times_s = file_data[device_name][stream_name]['time_s']
-activity_times_s = np.squeeze(np.array(activity_times_s))  # squeeze (optional) converts from a list of single-element lists to a 1D list
+# device_name = 'experiment-activities'
+# stream_name = 'activities'
+# activity_datas = file_data[device_name][stream_name]['data']
+# activity_times_s = file_data[device_name][stream_name]['time_s']
+# activity_times_s = np.squeeze(np.array(activity_times_s))  # squeeze (optional) converts from a list of single-element lists to a 1D list
 # Convert to strings for convenience.
-activity_datas = [[x.decode('utf-8') for x in datas] for datas in activity_datas]
+# activity_datas = [[x.decode('utf-8') for x in datas] for datas in activity_datas]
 # Combine start/stop rows to single activity entries with start/stop times.
 #   Each row is either the start or stop of the label.
 #   The notes and ratings fields are the same for the start/stop rows of the label, so only need to check one.
+activity_datas = emg.copy()
 exclude_bad_labels = True # some activities may have been marked as 'Bad' or 'Maybe' by the experimenter; submitted notes with the activity typically give more information
 activities_labels = []
 activities_start_times_s = []
 activities_end_times_s = []
 activities_ratings = []
 activities_notes = []
-for (row_index, time_s) in enumerate(activity_times_s):
-    label    = activity_datas[row_index][0]
-    is_start = activity_datas[row_index][1] == 'Start'
-    is_stop  = activity_datas[row_index][1] == 'Stop'
-    rating   = activity_datas[row_index][2]
-    notes    = activity_datas[row_index][3]
-    if exclude_bad_labels and rating in ['Bad', 'Maybe']:
-    continue
-    # Record the start of a new activity.
-    if is_start:
-    activities_labels.append(label)
-    activities_start_times_s.append(time_s)
-    activities_ratings.append(rating)
-    activities_notes.append(notes)
-    # Record the end of the previous activity.
-    if is_stop:
-    activities_end_times_s.append(time_s)
-# Loop through each activity that is designated for classification.
-for (label_index, activity_label) in enumerate(activities_to_classify):
-    if label_index == baseline_index:
-    continue
-    # Extract num_segments_per_subject examples from each instance of the activity.
-    # Then later, will select num_segments_per_subject in total from all instances.
-    file_label_indexes = [i for (i, label) in enumerate(activities_labels) if label==activity_label]
-    if len(file_label_indexes) == 0 and activity_label in activities_renamed:
-    for alternate_label in activities_renamed[activity_label]:
-        file_label_indexes = [i for (i, label) in enumerate(activities_labels) if label==alternate_label]
-        if len(file_label_indexes) > 0:
-        print('  Found renamed activity from "%s"' % alternate_label)
-        break
-    print('  Found %d instances of %s' % (len(file_label_indexes), activity_label))
-    for file_label_index in file_label_indexes:
-    start_time_s = activities_start_times_s[file_label_index]
-    end_time_s = activities_end_times_s[file_label_index]
-    duration_s = end_time_s -  start_time_s
-    # Extract example segments and generate a feature matrix for each one.
-    # num_examples = int(num_segments_per_subject/len(file_label_indexes))
-    # if file_label_index == file_label_indexes[-1]:
-    #   num_examples = num_segments_per_subject - num_examples*(len(file_label_indexes)-1)
-    num_examples = num_segments_per_subject
-    print('  Extracting %d examples from activity "%s" with duration %0.2fs' % (num_examples, activity_label, duration_s))
-    feature_matrices = get_feature_matrices(file_data,
-                                            start_time_s, end_time_s,
-                                            count=num_examples)
-    example_matrices_byLabel.setdefault(activity_label, [])
-    example_matrices_byLabel[activity_label].extend(feature_matrices)
+for (subject_id, content) in emg.items():
+    print()
+    print('Processing data for subject %s' % subject_id)
+    noActivity_matrices = []
+    for (data_file_index, file_data) in enumerate(file_datas):
+        for (label_index, activity_label) in enumerate(activities_to_classify):
+            if label_index == baseline_index:
+                continue
+            # Extract num_segments_per_subject examples from each instance of the activity.
+            # Then later, will select num_segments_per_subject in total from all instances.
+            file_label_indexes = [i for (i, label) in enumerate(activities_labels) if label==activity_label]
+            if len(file_label_indexes) == 0 and activity_label in activities_renamed:
+                for alternate_label in activities_renamed[activity_label]:
+                    file_label_indexes = [i for (i, label) in enumerate(activities_labels) if label==alternate_label]
+                    if len(file_label_indexes) > 0:
+                        print('  Found renamed activity from "%s"' % alternate_label)
+                        break
+            print('  Found %d instances of %s' % (len(file_label_indexes), activity_label))
+
+            for file_label_index in file_label_indexes:
+                start_time_s = activities_start_times_s[file_label_index]
+                end_time_s = activities_end_times_s[file_label_index]
+                duration_s = end_time_s -  start_time_s
+                # Extract example segments and generate a feature matrix for each one.
+                # num_examples = int(num_segments_per_subject/len(file_label_indexes))
+                # if file_label_index == file_label_indexes[-1]:
+                #   num_examples = num_segments_per_subject - num_examples*(len(file_label_indexes)-1)
+                num_examples = num_segments_per_subject
+                print('  Extracting %d examples from activity "%s" with duration %0.2fs' % (num_examples, activity_label, duration_s))
+                feature_matrices = get_feature_matrices(file_data,
+                                                        start_time_s, end_time_s,
+                                                        count=num_examples)
+                example_matrices_byLabel.setdefault(activity_label, [])
+                example_matrices_byLabel[activity_label].extend(feature_matrices)
 
 # Generate matrices for not doing any activity.
 # Will generate one matrix for each inter-activity portion,
