@@ -1,3 +1,11 @@
+'''
+INSTRUCTIONS
+
+In order to retrieve the desirable preprocessing split,
+please modify the variable `split` and write one of the following:
+    ['train', 'test']
+'''
+
 import numpy as np
 from scipy import interpolate # for resampling
 from scipy.signal import butter, lfilter # for filtering
@@ -12,6 +20,8 @@ stdoutOrigin=sys.stdout
 sys.stdout = open("log.txt", "w")
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
+save_dir = os.path.join(script_dir, 'EMG_preprocessed')
+split = 'train'
 
 activities_to_classify = [
   'Get/replace items from refrigerator/cabinets/drawers',
@@ -87,10 +97,9 @@ def data_loader(emg_ann):
 
 #TEST PER UN SOGGETTO
 # emg = load_data("S04_1.pkl")
-emg_annotations = pd.read_pickle(os.path.join(script_dir,'./action-net/ActionNet_train.pkl'))
+emg_annotations = pd.read_pickle(os.path.join(script_dir,f'./action-net/ActionNet_{split}.pkl'))
 emg = data_loader(emg_annotations)
 
-print(emg['S02']['4'].keys())
 #Subject structure:
 #myo-right: readings + timestamps | data + time_s 
 #myo-left:  readings + timestamps | data + time_s
@@ -331,7 +340,6 @@ for (subject_id, content) in emg.items():
                                 # print('time_indexes: ', len(time_indexes))
                                 # print(f'{correct_shape=}')
                                 correct_shape = False
-                                print(segment_end_time_s-segment_start_time_s, time_indexes, len(time_s))
                                 break
                         while len(time_indexes) > 100:
                             # print(' Decreasing segment length from %d to %d for segment starting at %f' % (len(time_indexes), 100, segment_start_time_s))
@@ -342,17 +350,18 @@ for (subject_id, content) in emg.items():
                         time_s = time_s[time_indexes]
                         data = data[time_indexes,:]
 
-                        # Zero padding over the feature matrices with shape[0] < 100 (ex. (54, 8)->(100, 8))
-                        if not correct_shape:
-                            #[time_indexes.append(len(time_indexes) + _) for _ in range(100-len(time_indexes))]
-                            data = np.pad(data, [(0, 100-data.shape[0]), (0, 0)], mode='constant', constant_values=0)
-                            print(data.shape)
+                        # # Zero padding over the feature matrices with shape[0] < 100 (ex. (54, 8)->(100, 8))
+                        # if not correct_shape:
+                        #     #[time_indexes.append(len(time_indexes) + _) for _ in range(100-len(time_indexes))]
+                        #     data = np.pad(data, [(0, 100-data.shape[0]), (0, 0)], mode='constant', constant_values=0)
+                        #     print(data.shape)
                         
-                        data = np.reshape(data, (segment_length, -1))
-                        print(data.shape)
+                        # data = np.reshape(data, (segment_length, -1))
+                        # print(data.shape)
                         # print('  Got data of shape', data.shape)
                         #try:
-                        feature_matrix = np.concatenate((feature_matrix, data), axis=1)
+                        if correct_shape:
+                            feature_matrix = np.concatenate((feature_matrix, data), axis=1)
                         #except:
                             #correct_shape = False
                     if correct_shape:
@@ -368,51 +377,11 @@ for (subject_id, content) in emg.items():
                 # if correct_shape:
                 #     count_iter += 1
 
+with open(os.path.join(save_dir, f'{split}_EMG_preprocess.pkl'), 'wb') as f:
+    pickle.dump(example_matrices_byLabel, f)
+
 sys.stdout.close()
 sys.stdout=stdoutOrigin
-
-def get_feature_matrices(data, start, end, count=20):
-    # Determine start/end times for each example segment.
-    start_time_s = start + 0.5
-    end_time_s = end - 0.5
-    segment_start_times_s = np.linspace(start_time_s, end_time_s - 10,
-                                        num=count,
-                                        endpoint=True)
-    # Create a feature matrix by concatenating each desired sensor stream.
-    feature_matrices = []
-    for segment_start_time_s in segment_start_times_s:
-        # print('Processing segment starting at %f' % segment_start_time_s)
-        segment_end_time_s = segment_start_time_s + 10
-        feature_matrix = np.empty(shape=(100, 0))
-        for (device_name, stream_name, extraction_fn) in data:
-            # print(' Adding data from [%s][%s]' % (device_name, stream_name))
-            data = np.squeeze(np.array(data[device_name][stream_name]['data']))
-            time_s = np.squeeze(np.array(data[device_name][stream_name]['time_s']))
-            time_indexes = np.where((time_s >= segment_start_time_s) & (time_s <= segment_end_time_s))[0]
-            # Expand if needed until the desired segment length is reached.
-            time_indexes = list(time_indexes)
-            while len(time_indexes) < 100:
-                print(' Increasing segment length from %d to %d for %s %s for segment starting at %f' % (len(time_indexes), 100, device_name, stream_name, segment_start_time_s))
-                if time_indexes[0] > 0:
-                    time_indexes = [time_indexes[0]-1] + time_indexes
-                elif time_indexes[-1] < len(time_s)-1:
-                    time_indexes.append(time_indexes[-1]+1)
-                else:
-                    raise AssertionError
-            while len(time_indexes) > 100:
-                print(' Decreasing segment length from %d to %d for %s %s for segment starting at %f' % (len(time_indexes), 100, device_name, stream_name, segment_start_time_s))
-                time_indexes.pop()
-            time_indexes = np.array(time_indexes)
-            
-            # Extract the data.
-            time_s = time_s[time_indexes]
-            data = data[time_indexes,:]
-            data = extraction_fn(data)
-            # print('  Got data of shape', data.shape)
-            feature_matrix = np.concatenate((feature_matrix, data), axis=1)
-        feature_matrices.append(feature_matrix)
-    return feature_matrices
-
 
 ################
 #EXAMPLES
