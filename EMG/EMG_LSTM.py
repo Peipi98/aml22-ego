@@ -14,7 +14,7 @@ class EMG_LSTM(nn.Module):
         self.lstm1 = LSTM(input_size=16, hidden_size=5)
         self.lstm2 = LSTM(input_size=5, hidden_size=1)
         self.dropout = Dropout(0.2)
-        self.dense = Linear(50, 20)
+        self.dense = Linear(50, num_classes)
 
     def forward(self, x):
         h1, (h1_T,c1_T) = self.lstm1(x)
