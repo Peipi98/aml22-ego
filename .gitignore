@@ -26,6 +26,7 @@ var/
 .installed.cfg
 *.egg
 *.idea
+.vscode
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -157,6 +158,7 @@ cmake-build-*/
 # File-based project format
 *.iws
 Data/
+EMG/EMG_preprocessed/*
 # IntelliJ
 out/
 
