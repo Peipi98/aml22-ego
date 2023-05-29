@@ -21,7 +21,7 @@ sys.stdout = open("log.txt", "w")
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 save_dir = os.path.join(script_dir, 'EMG_preprocessed')
-split = 'train'
+split = 'test'
 
 activities_to_classify = [
   'Get/replace items from refrigerator/cabinets/drawers',
@@ -56,7 +56,7 @@ activities_renamed = {
 #IMPLEMENTARE CARICAMENTO DATI
 ##############################
 def load_data(filename):
-    emg_data = pd.read_pickle(f"./Data/ActionNet/ActionNet-EMG/{filename}")
+    emg_data = pd.read_pickle(f"Data/ActionNet/ActionNet-EMG/{filename}")
     return emg_data
 
 def data_loader(emg_ann):
@@ -97,7 +97,8 @@ def data_loader(emg_ann):
 
 #TEST PER UN SOGGETTO
 # emg = load_data("S04_1.pkl")
-emg_annotations = pd.read_pickle(os.path.join(script_dir,f'./action-net/ActionNet_{split}.pkl'))
+
+emg_annotations = pd.read_pickle(f'action-net/ActionNet_{split}.pkl')
 emg = data_loader(emg_annotations)
 
 #Subject structure:
@@ -377,141 +378,19 @@ for (subject_id, content) in emg.items():
                 # if correct_shape:
                 #     count_iter += 1
 
-with open(os.path.join(save_dir, f'{split}_EMG_preprocess.pkl'), 'wb') as f:
-    pickle.dump(example_matrices_byLabel, f)
+df_list = []
+for activity_label in example_matrices_byLabel:
+    len_dict = len(example_matrices_byLabel[activity_label])
+    features = example_matrices_byLabel[activity_label]
+    labels = [activity_label] * len_dict
+
+    df_activity = pd.DataFrame({"features": features, 'activity_label': labels})
+    df_list.append(df_activity)
+df_save = pd.concat(df_list)
+df_save.to_pickle(os.path.join(save_dir, f'{split}_EMG_preprocess.pkl'))
+# with open(os.path.join(save_dir, f'{split}_EMG_preprocess.pkl'), 'wb') as f:
+    # pickle.dump(example_matrices_byLabel, f)
+
 
 sys.stdout.close()
 sys.stdout=stdoutOrigin
-
-################
-#EXAMPLES
-################
-
-'''
-
-
-# Will store intermediate examples from each file.
-example_matrices_byLabel = {}
-# Then will create the following 'final' lists with the correct number of examples.
-example_labels = []
-example_label_indexes = []
-example_matrices = []
-example_subject_ids = []
-print()
-
-noActivity_matrices = []
-
-# Get the timestamped label data.
-# As described in the HDF5 metadata, each row has entries for ['Activity', 'Start/Stop', 'Valid', 'Notes'].
-# device_name = 'experiment-activities'
-# stream_name = 'activities'
-# activity_datas = file_data[device_name][stream_name]['data']
-# activity_times_s = file_data[device_name][stream_name]['time_s']
-# activity_times_s = np.squeeze(np.array(activity_times_s))  # squeeze (optional) converts from a list of single-element lists to a 1D list
-# Convert to strings for convenience.
-# activity_datas = [[x.decode('utf-8') for x in datas] for datas in activity_datas]
-# Combine start/stop rows to single activity entries with start/stop times.
-#   Each row is either the start or stop of the label.
-#   The notes and ratings fields are the same for the start/stop rows of the label, so only need to check one.
-activity_datas = emg.copy()
-exclude_bad_labels = True # some activities may have been marked as 'Bad' or 'Maybe' by the experimenter; submitted notes with the activity typically give more information
-activities_labels = []
-activities_start_times_s = []
-activities_end_times_s = []
-activities_ratings = []
-activities_notes = []
-for (subject_id, content) in emg.items():
-    print()
-    print('Processing data for subject %s' % subject_id)
-    noActivity_matrices = []
-    for (data_file_index, file_data) in enumerate(file_datas):
-        for (label_index, activity_label) in enumerate(activities_to_classify):
-            if label_index == baseline_index:
-                continue
-            # Extract num_segments_per_subject examples from each instance of the activity.
-            # Then later, will select num_segments_per_subject in total from all instances.
-            file_label_indexes = [i for (i, label) in enumerate(activities_labels) if label==activity_label]
-            if len(file_label_indexes) == 0 and activity_label in activities_renamed:
-                for alternate_label in activities_renamed[activity_label]:
-                    file_label_indexes = [i for (i, label) in enumerate(activities_labels) if label==alternate_label]
-                    if len(file_label_indexes) > 0:
-                        print('  Found renamed activity from "%s"' % alternate_label)
-                        break
-            print('  Found %d instances of %s' % (len(file_label_indexes), activity_label))
-
-            for file_label_index in file_label_indexes:
-                start_time_s = activities_start_times_s[file_label_index]
-                end_time_s = activities_end_times_s[file_label_index]
-                duration_s = end_time_s -  start_time_s
-                # Extract example segments and generate a feature matrix for each one.
-                # num_examples = int(num_segments_per_subject/len(file_label_indexes))
-                # if file_label_index == file_label_indexes[-1]:
-                #   num_examples = num_segments_per_subject - num_examples*(len(file_label_indexes)-1)
-                num_examples = num_segments_per_subject
-                print('  Extracting %d examples from activity "%s" with duration %0.2fs' % (num_examples, activity_label, duration_s))
-                feature_matrices = get_feature_matrices(file_data,
-                                                        start_time_s, end_time_s,
-                                                        count=num_examples)
-                example_matrices_byLabel.setdefault(activity_label, [])
-                example_matrices_byLabel[activity_label].extend(feature_matrices)
-
-# Generate matrices for not doing any activity.
-# Will generate one matrix for each inter-activity portion,
-#  then later select num_baseline_segments_per_subject of them.
-for (label_index, activity_label) in enumerate(activities_labels):
-    if label_index == len(activities_labels)-1:
-    continue
-    print('  Getting baseline examples between activity "%s"' % (activity_label))
-    noActivity_start_time_s = activities_end_times_s[label_index]
-    noActivity_end_time_s = activities_start_times_s[label_index+1]
-    duration_s = noActivity_end_time_s -  noActivity_start_time_s
-    if duration_s < segment_duration_s:
-    continue
-    # Extract example segments and generate a feature matrix for each one.
-    feature_matrices = get_feature_matrices(file_data,
-                                            noActivity_start_time_s,
-                                            noActivity_end_time_s,
-                                            count=10)
-    noActivity_matrices.extend(feature_matrices)
-
-# Choose a subset of the examples of each label, so the correct number is retained.
-# Will evenly distribute the selected indexes over all possibilities.
-for (activity_label_index, activity_label) in enumerate(activities_to_classify):
-if activity_label_index == baseline_index:
-    continue
-print(' Selecting %d examples for subject %s of activity "%s"' % (num_segments_per_subject, subject_id, activity_label))
-if activity_label not in example_matrices_byLabel:
-    print('\n'*5)
-    print('='*50)
-    print('='*50)
-    print('  No examples found!')
-    # print('  Press enter to continue ')
-    print('\n'*5)
-    time.sleep(10)
-    continue
-feature_matrices = example_matrices_byLabel[activity_label]
-example_indexes = np.round(np.linspace(0, len(feature_matrices)-1,
-                                            endpoint=True,
-                                            num=num_segments_per_subject,
-                                            dtype=int))
-for example_index in example_indexes:
-    example_labels.append(activity_label)
-    example_label_indexes.append(activity_label_index)
-    example_matrices.append(feature_matrices[example_index])
-    example_subject_ids.append(subject_id)
-
-# Choose a subset of the baseline examples.
-print(' Selecting %d examples for subject %s of activity "%s"' % (num_baseline_segments_per_subject, subject_id, baseline_label))
-noActivity_indexes = np.round(np.linspace(0, len(noActivity_matrices)-1,
-                                        endpoint=True,
-                                        num=num_baseline_segments_per_subject,
-                                        dtype=int))
-for noActivity_index in noActivity_indexes:
-example_labels.append(baseline_label)
-example_label_indexes.append(baseline_index)
-example_matrices.append(noActivity_matrices[noActivity_index])
-example_subject_ids.append(subject_id)
-
-
-print()
-'''
