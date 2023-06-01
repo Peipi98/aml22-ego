@@ -49,8 +49,8 @@ class EMG_dataset(Dataset):
 
     def __getitem__(self, idx):
         emg, label = self.df.iloc[idx, :]
-        label = torch.tensor(activities_to_classify[label])
-        emg = torch.from_numpy(emg)
+        label = torch.tensor(activities_to_classify[label]).to(torch.long)
+        emg = torch.from_numpy(emg).to(torch.float32)
         
         return (emg, label)
 
