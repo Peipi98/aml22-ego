@@ -1,16 +1,15 @@
 import torch
 import torch.nn as nn
-import torchaudio.transforms as T
 import torch.optim as optim
-import scipy as sp
-import pandas as pd
+
+import numpy as np
 from torch.utils.data import DataLoader, Subset
 from torch.autograd import Variable
 from EMG_dataloader import EMG_dataset
 from EMG_LSTM import EMG_LSTM
 from sklearn.model_selection import train_test_split
 import os
-from tqdm import tqdm
+import pickle as pk
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -59,7 +58,11 @@ def train(model, train_dataloader, val_dataloader, num_epochs, save_model=False)
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
     optimizer = optim.Adam(model.parameters())
-    
+    train_acc = np.zeros(num_epochs)
+    val_acc = np.zeros(num_epochs)
+    train_loss = np.zeros(num_epochs)
+    val_loss = np.zeros(num_epochs)
+
     for epoch in range(num_epochs):
         # Training
         model.train()
@@ -87,32 +90,48 @@ def train(model, train_dataloader, val_dataloader, num_epochs, save_model=False)
             train_running_loss += loss.item()
         
         train_epoch_loss = train_running_loss / len(train_dataloader)
-        train_epoch_accuracy = train_correct_predictions / train_total_samples
-        
+        train_epoch_accuracy = 100 * train_correct_predictions / train_total_samples
+        train_acc[epoch] = train_epoch_accuracy
+        train_loss[epoch] = train_epoch_loss
+
         # Validation
         model.eval()
         val_correct_predictions = 0
         val_total_samples = 0
-        
+        running_vloss = 0.0
         with torch.no_grad():
             for inputs, labels in val_dataloader:
                 inputs, labels = Variable(inputs.to(device)), Variable(labels.to(device))
                 
                 # Forward pass
                 outputs = model(inputs)
-                
+                vloss = criterion(outputs, labels)
+                running_vloss += vloss
                 # Track accuracy
                 _, predicted = torch.max(outputs.data, 1)
                 val_total_samples += labels.size(0)
                 val_correct_predictions += (predicted == labels).sum().item()
         
-        val_epoch_accuracy = val_correct_predictions / val_total_samples
-        
+        val_epoch_accuracy = 100 * val_correct_predictions / val_total_samples
+        val_acc[epoch] = val_epoch_accuracy
+        avg_vloss = running_vloss / len(val_dataloader)
+        val_loss[epoch] = avg_vloss
+
         print(f'Epoch [{epoch+1}/{num_epochs}], '
-              f'Train Loss: {train_epoch_loss:.4f}, Train Accuracy: {train_epoch_accuracy:.4f}, '
+              f'Train Loss: {train_epoch_loss:.4f}, Train Accuracy: {train_epoch_accuracy:.4f}, ', f'Val Loss: {avg_vloss:.4f}, '
               f'Val Accuracy: {val_epoch_accuracy:.4f}')
     if save_model:
         torch.save(model.state_dict(), os.path.join(os.path.dirname(__file__), "models", "emg_model.pth"))
+        with open(os.path.join(os.path.dirname(__file__), "models", "acc_loss.pkl"), "wb") as f:
+            acc_loss = {
+                "train_acc": train_acc,
+                "train_loss": train_loss,
+                "val_acc": val_acc,
+                "val_loss": val_loss
+            }
+            pk.dump(acc_loss, f)
+
+    return (train_acc, train_loss), (val_acc, val_loss)
 
 def test(model, dataloader):    
     model.eval()
@@ -132,7 +151,7 @@ def test(model, dataloader):
             correct_predictions += (predicted == labels).sum().item()
     
     accuracy = correct_predictions / total_samples
-    print(f"Test Accuracy:\n{accuracy}")
+    print(f"Test Accuracy:\n{accuracy:.4f}")
     return accuracy
 
 
@@ -141,5 +160,5 @@ if __name__ == "__main__":
 
     model = EMG_LSTM(20)
     model.to(device)
-    train(model, train_data, val_data, 200, save_model=True)
+    train(model, train_data, val_data, 3, save_model=True)
     test(model, test_data)
