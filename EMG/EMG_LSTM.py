@@ -19,10 +19,10 @@ class EMG_LSTM(nn.Module):
         self.dense = Linear(50, num_classes)
 
     def forward(self, x):
-        h1, (h1_T,c1_T) = self.lstm1(x)
-        h2, (h2_T,c2_T) = self.lstm2(h1)
-        # return_sequences = False equivalent following
-        x = h2[:, -1, :]
+        x, (h1_T,c1_T) = self.lstm1(x)
+        x, (h2_T,c2_T) = self.lstm2(x)
+        # return_sequences = False tensorflow equivalent following
+        x = x[:, -1, :]
         x = self.dropout(x)
         x = self.dense(x)
         x = softmax(x, dim=1)

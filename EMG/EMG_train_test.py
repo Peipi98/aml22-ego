@@ -1,15 +1,18 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
-import numpy as np
 from torch.utils.data import DataLoader, Subset
 from torch.autograd import Variable
+from torch.optim.lr_scheduler import LRScheduler
+
+import numpy as np
+import os
+import pickle as pk
+
 from EMG_dataloader import EMG_dataset
 from EMG_LSTM import EMG_LSTM
 from sklearn.model_selection import train_test_split
-import os
-import pickle as pk
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -57,7 +60,7 @@ def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=Fal
     # criterion = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    optimizer = optim.Adam(model.parameters(), lr=1e-5)
     train_acc = np.zeros(num_epochs)
     val_acc = np.zeros(num_epochs)
     train_loss = np.zeros(num_epochs)
