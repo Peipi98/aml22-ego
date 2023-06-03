@@ -10,6 +10,7 @@ from EMG_dataloader import EMG_dataset
 from EMG_LSTM import EMG_LSTM
 from sklearn.model_selection import train_test_split
 import os
+from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -54,8 +55,10 @@ def load_data(batch_size=32):
 
 def train(model, train_dataloader, val_dataloader, num_epochs, save_model=False):
     
+    # criterion = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
+    optimizer = optim.Adam(model.parameters())
     
     for epoch in range(num_epochs):
         # Training
@@ -109,7 +112,7 @@ def train(model, train_dataloader, val_dataloader, num_epochs, save_model=False)
               f'Train Loss: {train_epoch_loss:.4f}, Train Accuracy: {train_epoch_accuracy:.4f}, '
               f'Val Accuracy: {val_epoch_accuracy:.4f}')
     if save_model:
-        torch.save(model, "models")
+        torch.save(model.state_dict(), os.path.join(os.path.dirname(__file__), "models", "emg_model.pth"))
 
 def test(model, dataloader):    
     model.eval()
@@ -129,7 +132,7 @@ def test(model, dataloader):
             correct_predictions += (predicted == labels).sum().item()
     
     accuracy = correct_predictions / total_samples
-    
+    print(f"Test Accuracy:\n{accuracy}")
     return accuracy
 
 
@@ -138,5 +141,5 @@ if __name__ == "__main__":
 
     model = EMG_LSTM(20)
     model.to(device)
-    train(model, train_data, val_data, 20)
+    train(model, train_data, val_data, 200, save_model=True)
     test(model, test_data)
