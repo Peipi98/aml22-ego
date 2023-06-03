@@ -52,12 +52,12 @@ def load_data(batch_size=32):
     return train_dataset, val_dataset, test_dataset
 
 
-def train(model, train_dataloader, val_dataloader, num_epochs, save_model=False):
+def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=False):
     
     # criterion = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=0.01)
     train_acc = np.zeros(num_epochs)
     val_acc = np.zeros(num_epochs)
     train_loss = np.zeros(num_epochs)
@@ -120,6 +120,7 @@ def train(model, train_dataloader, val_dataloader, num_epochs, save_model=False)
         print(f'Epoch [{epoch+1}/{num_epochs}], '
               f'Train Loss: {train_epoch_loss:.4f}, Train Accuracy: {train_epoch_accuracy:.4f}, ', f'Val Loss: {avg_vloss:.4f}, '
               f'Val Accuracy: {val_epoch_accuracy:.4f}')
+        
     if save_model:
         torch.save(model.state_dict(), os.path.join(os.path.dirname(__file__), "models", "emg_model.pth"))
         with open(os.path.join(os.path.dirname(__file__), "models", "acc_loss.pkl"), "wb") as f:
@@ -160,5 +161,5 @@ if __name__ == "__main__":
 
     model = EMG_LSTM(20)
     model.to(device)
-    train(model, train_data, val_data, 3, save_model=True)
+    train(model, train_data, val_data, num_epochs=200, save_model=True)
     test(model, test_data)

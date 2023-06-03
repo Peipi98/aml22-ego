@@ -24,6 +24,7 @@ def plot_images(train, valid, type="Accuracy") -> None:
     plt.savefig(f'{type}_plot.png')
     plt.show()
 
+
 if __name__ == "__main__":
     acc_loss = load_acc_loss()
 
