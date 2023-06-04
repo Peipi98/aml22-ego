@@ -73,7 +73,7 @@ def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=Fal
         train_correct_predictions = 0
         train_total_samples = 0
         
-        for inputs, labels in train_dataloader:
+        for _, (inputs, labels) in enumerate(train_dataloader):
             inputs, labels = Variable(inputs.to(device)), Variable(labels.to(device))
             optimizer.zero_grad()
             

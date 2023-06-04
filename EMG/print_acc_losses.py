@@ -21,7 +21,7 @@ def plot_images(train, valid, type="Accuracy") -> None:
         plt.ylim(0, 100)
 
     plt.legend()
-    plt.savefig(f'{type}_plot.png')
+    plt.savefig(f'images/{type}_plot.png')
     plt.show()
 
 
