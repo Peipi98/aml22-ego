@@ -129,19 +129,15 @@ print(emg.keys())
 
 # Define segmentation parameters.
 resampled_Fs = 10 # define a resampling rate for all sensors to interpolate
-num_segments_per_subject = 5  # 20
+num_segments_per_subject = 20  # 20
 num_baseline_segments_per_subject = 20 # num_segments_per_subject*(max(1, len(activities_to_classify)-1))
-segment_duration_s = 10
+segment_duration_s = 5
 segment_length = int(round(resampled_Fs*segment_duration_s))
 buffer_startActivity_s = 2
 buffer_endActivity_s = 2
 
 # Define filtering parameters.
 filter_cutoff_emg_Hz = 5
-filter_cutoff_tactile_Hz = 2
-filter_cutoff_gaze_Hz = 5
-num_tactile_rows_aggregated = 4
-num_tactile_cols_aggregated = 4
 
 # 
 
@@ -308,13 +304,13 @@ for (subject_id, content) in emg.items():
                 start_time_s = start #+ 0.5
                 end_time_s = end #- 0.5
                 duration_s = end_time_s - start_time_s
-                if duration_s < 10.0:
+                if duration_s < 5.0:
                     continue
                 # Extract example segments and generate a feature matrix for each one.
                 num_examples = num_segments_per_subject
                 print('  Extracting %d examples from activity "%s" with duration %0.2fs' % (num_examples, activity_label, duration_s))
                 
-                segment_start_times_s = np.linspace(start_time_s, end_time_s - 10.0,
+                segment_start_times_s = np.linspace(start_time_s, end_time_s - 5.0,
                                                         num = num_examples,
                                                         endpoint=True)
                 
@@ -323,8 +319,8 @@ for (subject_id, content) in emg.items():
 
                 for j, segment_start_time_s in enumerate(segment_start_times_s):
                     # print('Processing segment starting at %f' % segment_start_time_s)
-                    segment_end_time_s = segment_start_time_s + 10.0
-                    feature_matrix = np.empty(shape=(100, 0))
+                    segment_end_time_s = segment_start_time_s + 5.0
+                    feature_matrix = np.empty(shape=(50, 0))
                     for key in ['myo_right', 'myo_left']:
                         # print(' Adding data from [%s][%s]' % (device_name, stream_name))
                         data = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_readings']))
@@ -332,7 +328,7 @@ for (subject_id, content) in emg.items():
                         time_indexes = np.where((time_s >= segment_start_time_s) & (time_s <= segment_end_time_s))[0]
                         # Expand if needed until the desired segment length is reached.
                         time_indexes = list(time_indexes)
-                        while len(time_indexes) < 100:
+                        while len(time_indexes) < 50:
                             # print(' Increasing segment length from %d to %d for segment starting at %f' % (len(time_indexes), 100, segment_start_time_s))
                             if time_indexes[0] > 0:
                                 time_indexes = [time_indexes[0]-1] + time_indexes
@@ -343,7 +339,7 @@ for (subject_id, content) in emg.items():
                                 # print(f'{correct_shape=}')
                                 correct_shape = False
                                 break
-                        while len(time_indexes) > 100:
+                        while len(time_indexes) > 50:
                             # print(' Decreasing segment length from %d to %d for segment starting at %f' % (len(time_indexes), 100, segment_start_time_s))
                             time_indexes.pop()
                         time_indexes = np.array(time_indexes)

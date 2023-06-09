@@ -60,7 +60,7 @@ def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=Fal
     # criterion = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
     train_acc = np.zeros(num_epochs)
     val_acc = np.zeros(num_epochs)
     train_loss = np.zeros(num_epochs)
