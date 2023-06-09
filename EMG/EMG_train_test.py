@@ -9,7 +9,7 @@ import numpy as np
 import os
 import pickle as pk
 
-from EMG_dataloader import EMG_dataset
+from EMG_dataset import EMG_dataset
 from EMG_LSTM import EMG_LSTM
 from sklearn.model_selection import train_test_split
 
@@ -60,7 +60,7 @@ def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=Fal
     # criterion = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
-    optimizer = optim.Adam(model.parameters(), lr=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
     train_acc = np.zeros(num_epochs)
     val_acc = np.zeros(num_epochs)
     train_loss = np.zeros(num_epochs)

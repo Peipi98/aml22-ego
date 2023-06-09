@@ -11,18 +11,19 @@ from torch import argmax, softmax
 class EMG_LSTM(nn.Module):
     def __init__(self, num_classes):
         super(EMG_LSTM, self).__init__()
-        self.lstm1 = LSTM(input_size=16, hidden_size=5, batch_first=True)
+        self.lstm1 = LSTM(input_size=16, hidden_size=50, batch_first=True)
         # TODO: modify 2nd LSTM in order to output (batch_size,50). 
         # (At the moment the output is (batch_size, 100, 1))
-        self.lstm2 = LSTM(input_size=5, hidden_size=50, batch_first=True)
+        # self.lstm2 = LSTM(input_size=5, hidden_size=50, batch_first=True)
         self.dropout = Dropout(0.2)
         self.dense = Linear(50, num_classes)
 
     def forward(self, x):
         x, (h1_T,c1_T) = self.lstm1(x)
-        x, (h2_T,c2_T) = self.lstm2(x)
+        # x, (h2_T,c2_T) = self.lstm2(x)
         # return_sequences = False tensorflow equivalent following
-        x = x[:, -1, :]
+        x = torch.squeeze(c1_T)
+        # x = x[:, -1, :]
         x = self.dropout(x)
         x = self.dense(x)
         x = softmax(x, dim=1)
