@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Subset
 from torch.autograd import Variable
-from torch.optim.lr_scheduler import LRScheduler
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, StepLR, LRScheduler, ReduceLROnPlateau
 
 import numpy as np
 import os
@@ -21,7 +21,7 @@ def load_data(batch_size=32):
     directory = os.path.join(os.path.dirname(__file__), "EMG_preprocessed")
     train_set = EMG_dataset(directory, 'train_EMG_preprocess.pkl')
     test_set = EMG_dataset(directory, 'test_EMG_preprocess.pkl')
-
+    '''
     train_indexes, val_indexes = train_test_split(
         range(len(train_set)),
         test_size=0.2,
@@ -30,21 +30,21 @@ def load_data(batch_size=32):
     )
 
     train_set, val_set = Subset(train_set, train_indexes), Subset(train_set, val_indexes)
-
+    '''
     train_dataset = DataLoader(
         train_set,
         batch_size=batch_size,
         shuffle=True,
         num_workers=2
     )
-
+    '''
     val_dataset = DataLoader(
         val_set,
         batch_size=batch_size,
         shuffle=False,
         num_workers=2
     )
-
+    '''
     test_dataset = DataLoader(
         test_set,
         batch_size=batch_size,
@@ -52,7 +52,8 @@ def load_data(batch_size=32):
         num_workers=2
     )
 
-    return train_dataset, val_dataset, test_dataset
+    # return train_dataset, val_dataset, test_dataset
+    return train_dataset, test_dataset
 
 
 def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=False):
@@ -60,7 +61,11 @@ def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=Fal
     # criterion = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    # scheduler = ReduceLROnPlateau(optimizer, factor=0.1, verbose=True)
+    # scheduler = StepLR(optimizer, step_size=75, gamma=0.1, verbose=True)
+    scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=20)
+
     train_acc = np.zeros(num_epochs)
     val_acc = np.zeros(num_epochs)
     train_loss = np.zeros(num_epochs)
@@ -119,7 +124,7 @@ def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=Fal
         val_acc[epoch] = val_epoch_accuracy
         avg_vloss = running_vloss / len(val_dataloader)
         val_loss[epoch] = avg_vloss
-
+        scheduler.step()
         print(f'Epoch [{epoch+1}/{num_epochs}], '
               f'Train Loss: {train_epoch_loss:.4f}, Train Accuracy: {train_epoch_accuracy:.4f}, ', f'Val Loss: {avg_vloss:.4f}, '
               f'Val Accuracy: {val_epoch_accuracy:.4f}')
@@ -160,9 +165,9 @@ def test(model, dataloader):
 
 
 if __name__ == "__main__":
-    train_data, val_data, test_data = load_data(batch_size=32)
+    train_data, test_data = load_data(batch_size=32)
 
     model = EMG_LSTM(20)
     model.to(device)
-    train(model, train_data, val_data, num_epochs=200, save_model=True)
-    test(model, test_data)
+    train(model, train_data, test_data, num_epochs=200, save_model=True)
+    # test(model, test_data)
