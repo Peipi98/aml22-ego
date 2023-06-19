@@ -358,7 +358,7 @@ for (subject_id, content) in emg.items():
                         # print(data.shape)
                         # print('  Got data of shape', data.shape)
                         #try:
-                        assert correct_shape, "suca"
+                        assert correct_shape, "incorrect shape"
                         if correct_shape:
                             feature_matrix = np.concatenate((feature_matrix, data), axis=1)
                         #except:
