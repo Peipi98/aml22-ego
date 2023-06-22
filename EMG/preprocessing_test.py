@@ -14,10 +14,7 @@ from matplotlib import pyplot as plt
 import pickle
 from collections import OrderedDict
 import os, glob
-import sys 
-
-stdoutOrigin=sys.stdout 
-sys.stdout = open("log.txt", "w")
+import sys
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 save_dir = os.path.join(script_dir, 'EMG_preprocessed')
@@ -52,9 +49,6 @@ activities_renamed = {
   'Get/replace items from refrigerator/cabinets/drawers': ['Get items from refrigerator/cabinets/drawers'],
 }
 
-##############################
-#IMPLEMENTARE CARICAMENTO DATI
-##############################
 def load_data(filename):
     emg_data = pd.read_pickle(f"Data/ActionNet/ActionNet-EMG/{filename}")
     return emg_data
@@ -95,9 +89,6 @@ def data_loader(emg_ann):
 
     return data_bySubject
 
-#TEST PER UN SOGGETTO
-# emg = load_data("S04_1.pkl")
-
 emg_annotations = pd.read_pickle(f'action-net/ActionNet_{split}.pkl')
 emg = data_loader(emg_annotations)
 
@@ -107,23 +98,6 @@ emg = data_loader(emg_annotations)
 #start: start label time
 #stop: stop label time
 #description: label
-
-#dictionary[subject][myo-arm][data]
-#dictionary[subject][myo-arm][time_s]
-
-# We need three nested dictionaries
-# First level: subject
-# Second level: myo-arm
-# Third level: myo-arm-content
-# INPUT: expirements
-# DESIRED OUTPUT: 100x16 matricies for each example.
-# To do that we need to preprocess the data and then 
-# We have to concatenete the 2 100x8 matricies.
-# Each sequence has to be labeled with the start and stop timestamps.
-# So we can make a dictionary like this:
-# dictionary[subject][(Matrix, label)]
-
-#emg_annotations = pd.read_pickle('./action-net/ActionNet_train.pkl')
 
 print(emg.keys())
 
@@ -139,10 +113,8 @@ buffer_endActivity_s = 2
 # Define filtering parameters.
 filter_cutoff_emg_Hz = 5
 
-# 
-
 ###########################################
-#IMPLEMENTARE PREPROCESSING [ABS + LOWPASS]
+#     PREPROCESSING [ABS + LOWPASS]       #
 ###########################################
 def lowpass_filter(data, cutoff, Fs, order=5):
   nyq = 0.5 * Fs
@@ -170,8 +142,7 @@ for (subject_id, content) in emg.items():
                 y = y - np.amin(y) - 1
                 emg[subject_id][video].at[i, key + '_readings'] = y 
                 emg[subject_id][video].at[i, key + '_timestamps'] = t
-                #data_dict[key + '_readings'].append(y)
-                #data_dict[key + '_timestamps'].append(t)
+
 #########
 #RESAMPLE
 #########
@@ -190,10 +161,7 @@ for (subject_id, content) in emg.items():
                 if i == 0:
                     #calibration
                     continue
-                #data1 = np.squeeze(np.array(data_dict['myo_right_readings'][1]))
                 data1 = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_readings']))
-                # print(f'data: ', data1.shape)
-                #time_s = np.squeeze(np.array(data_dict['myo_right_timestamps'][1]))
                 time_s = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_timestamps']))
 
                 target_time_s = np.linspace(time_s[0], time_s[-1],
@@ -217,52 +185,11 @@ for (subject_id, content) in emg.items():
                         print('Timestep indexes with NaN:', np.where(timesteps_have_nan)[0])
                         print('\n'*5)
                         data_resampled[np.isnan(data_resampled)] = 0
-                #print((time_s.size -1) / (time_s[-1] - time_s[0]))
-                # print(f'{subject_id=} | {video=}')
-                # print(len(data1))
-                # print(len(data_resampled))
-                # print(len(emg[subject_id][video].loc[i, f'{key}_readings']))
+
                 emg[subject_id][video].at[i, f'{key}_readings'] = data_resampled
                 emg[subject_id][video].at[i, f'{key}_timestamps'] = target_time_s
-#print(emg[['myo_right_readings','myo_right_timestamps']])
 
-'''
-      data = np.squeeze(np.array(file_data[device_name][stream_name]['data']))
-      time_s = np.squeeze(np.array(file_data[device_name][stream_name]['time_s']))
-      target_time_s = np.linspace(time_s[0], time_s[-1],
-                                  num=int(round(1+resampled_Fs*(time_s[-1] - time_s[0]))),
-                                  endpoint=True)
-      fn_interpolate = interpolate.interp1d(
-          time_s, # x values
-          data,   # y values
-          axis=0,              # axis of the data along which to interpolate
-          kind='linear',       # interpolation method, such as 'linear', 'zero', 'nearest', 'quadratic', 'cubic', etc.
-          fill_value='extrapolate' # how to handle x values outside the original range
-      )
-      data_resampled = fn_interpolate(target_time_s)
-      if np.any(np.isnan(data_resampled)):
-        print('\n'*5)
-        print('='*50)
-        print('='*50)
-        print('FOUND NAN')
-        print(subject_id, device_name, stream_name)
-        timesteps_have_nan = np.any(np.isnan(data_resampled), axis=tuple(np.arange(1,np.ndim(data_resampled))))
-        print('Timestep indexes with NaN:', np.where(timesteps_have_nan)[0])
-        print_var(data_resampled)
-        # input('Press enter to continue ')
-        print('\n'*5)
-        time.sleep(10)
-        data_resampled[np.isnan(data_resampled)] = 0
-      file_data[device_name][stream_name]['time_s'] = target_time_s
-      file_data[device_name][stream_name]['data'] = data_resampled
-    data_bySubject[subject_id][data_file_index] = file_data
 
-print(data_dict)
-'''
-
-########################################
-#IMPLEMENTARE SEGMENTAZIONE E DATALOADER
-#######################################
 
 #We take one stream of data and we segment it creating a matrix of 100x8 for each arm.
 #We take the resampled data and we create features matricies.
@@ -310,7 +237,7 @@ for (subject_id, content) in emg.items():
                 num_examples = num_segments_per_subject
                 print('  Extracting %d examples from activity "%s" with duration %0.2fs' % (num_examples, activity_label, duration_s))
                 
-                segment_start_times_s = np.linspace(start_time_s, end_time_s - 5.0,
+                segment_start_times_s = np.linspace(start_time_s, end_time_s - segment_duration_s,
                                                         num = num_examples,
                                                         endpoint=True)
                 
@@ -319,8 +246,8 @@ for (subject_id, content) in emg.items():
 
                 for j, segment_start_time_s in enumerate(segment_start_times_s):
                     # print('Processing segment starting at %f' % segment_start_time_s)
-                    segment_end_time_s = segment_start_time_s + 5.0
-                    feature_matrix = np.empty(shape=(50, 0))
+                    segment_end_time_s = segment_start_time_s + segment_duration_s
+                    feature_matrix = np.empty(shape=(10 * segment_duration_s, 0))
                     for key in ['myo_right', 'myo_left']:
                         # print(' Adding data from [%s][%s]' % (device_name, stream_name))
                         data = np.squeeze(np.array(emg[subject_id][video].loc[i, f'{key}_readings']))
@@ -328,7 +255,7 @@ for (subject_id, content) in emg.items():
                         time_indexes = np.where((time_s >= segment_start_time_s) & (time_s <= segment_end_time_s))[0]
                         # Expand if needed until the desired segment length is reached.
                         time_indexes = list(time_indexes)
-                        while len(time_indexes) < 50:
+                        while len(time_indexes) < 10 * segment_duration_s:
                             # print(' Increasing segment length from %d to %d for segment starting at %f' % (len(time_indexes), 100, segment_start_time_s))
                             if time_indexes[0] > 0:
                                 time_indexes = [time_indexes[0]-1] + time_indexes
@@ -339,7 +266,7 @@ for (subject_id, content) in emg.items():
                                 # print(f'{correct_shape=}')
                                 correct_shape = False
                                 break
-                        while len(time_indexes) > 50:
+                        while len(time_indexes) > 10 * segment_duration_s:
                             # print(' Decreasing segment length from %d to %d for segment starting at %f' % (len(time_indexes), 100, segment_start_time_s))
                             time_indexes.pop()
                         time_indexes = np.array(time_indexes)
@@ -358,7 +285,6 @@ for (subject_id, content) in emg.items():
                         # print(data.shape)
                         # print('  Got data of shape', data.shape)
                         #try:
-                        assert correct_shape, "incorrect shape"
                         if correct_shape:
                             feature_matrix = np.concatenate((feature_matrix, data), axis=1)
                         #except:

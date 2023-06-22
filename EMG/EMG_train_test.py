@@ -4,7 +4,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Subset
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, StepLR, LRScheduler, ReduceLROnPlateau
-from torchmetrics.classification import MulticlassAccuracy
 
 import numpy as np
 import os
@@ -90,9 +89,6 @@ def train(model, train_dataloader, val_dataloader, num_epochs=20, save_model=Fal
     val_acc_5 = np.zeros(num_epochs)
     train_loss = np.zeros(num_epochs)
     val_loss = np.zeros(num_epochs)
-
-    mca_1 = MulticlassAccuracy(num_classes=20, top_k=1)
-    mca_5 = MulticlassAccuracy(num_classes=20, top_k=5)
 
     for epoch in range(num_epochs):
         # Training
