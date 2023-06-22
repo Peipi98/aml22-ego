@@ -1,14 +1,25 @@
 action: save # train or test
 name: saved_feat_I3D
-split: test
+split: train
 resume_from: ./saved_models/I3D_SourceOnlyD1
 
 save:
   num_clips: 5
   dense_sampling:
-    RGB: True
+    RGB: True # True -> Dense, False -> Uniform
+    EMG: False
   num_frames_per_clip:
-    RGB: 16
+    RGB: 5
+    EMG: 0
+
+test:
+  num_clips: 5 # number of clips in testing
+  dense_sampling: # sampling version adopted in test for each modality
+    RGB: True
+    EMG: False
+  num_frames_per_clip: # number of frames adopted in test for each modality
+    RGB: 5
+    EMG: 0
 
 dataset:
   annotations_path: train_val
@@ -17,10 +28,12 @@ dataset:
   stride: 2
   resolution: 224
   RGB:
-    data_path: ???
+    data_path: "prova"
     tmpl: "img_{:010d}.jpg"
   Event:
     rgb4e: 6
+  EMG:
+    data_path: "./emg_spectrograms"
 
 # these are the action recognition models for each modality
 models:
@@ -35,5 +48,15 @@ models:
     sgd_momentum: 0.9
     weight_decay: 1e-7
     weight_i3d_rgb: './pretrained_i3d/rgb_imagenet.pt'
+  EMG:
+    model: EMG_CNN
+    dropout: 0.5
+    normalize: False
+    kwargs: {}
+    lr_steps: 3000
+    lr: 0.01
+    sgd_momentum: 0.9
+
+# Da
 
 

@@ -8,6 +8,7 @@ from PIL import Image
 import os
 import os.path
 import numpy as np
+import pickle
 from numpy.random import randint
 from utils.logger import logger
 
@@ -87,6 +88,8 @@ class EpicKitchensDataset(data.Dataset, ABC):
             self.model_features = pd.merge(self.model_features, self.list_file, how="inner", on="uid")
 
     def _get_train_indices(self, record, modality='RGB'):
+        if modality == 'EMG':
+            return [0]
         if self.dense_sampling[modality]:
             # selecting one frame and discarding another (alternation), to avoid duplicates
             center_frames = np.linspace(0, record.num_frames[modality], self.num_clips + 2,
@@ -124,6 +127,8 @@ class EpicKitchensDataset(data.Dataset, ABC):
         return indices
 
     def _get_val_indices(self, record, modality):
+        if modality == 'EMG':
+            return [0]
         max_frame_idx = max(1, record.num_frames[modality])
         if self.dense_sampling[modality]:
             n_clips = self.num_clips
@@ -200,6 +205,10 @@ class EpicKitchensDataset(data.Dataset, ABC):
                 segment_indices[modality] = self._get_val_indices(record, modality)
 
         for m in self.modalities:
+            if m == 'EMG':
+                frames[m] = self._load_data(m, record, [0])
+                label = record.label
+                continue
             img, label = self.get(m, record, segment_indices[m])
             frames[m] = img
 
@@ -216,12 +225,16 @@ class EpicKitchensDataset(data.Dataset, ABC):
             frame = self._load_data(modality, record, p)
             images.extend(frame)
         # finally, all the transformations are applied
-        process_data = self.transform[modality](images)
+        if modality != "EMG":
+            process_data = self.transform[modality](images)
+        else:
+            process_data = images
         return process_data, record.label
 
     def _load_data(self, modality, record, idx):
         data_path = self.dataset_conf[modality].data_path
-        tmpl = self.dataset_conf[modality].tmpl
+        if modality != "EMG":   
+            tmpl = self.dataset_conf[modality].tmpl
         if modality == 'RGB' or modality == 'RGBDiff':
             # here the offset for the starting index of the sample is added
             idx_untrimmed = record.start_frame + idx
@@ -280,6 +293,23 @@ class EpicKitchensDataset(data.Dataset, ABC):
                 else:
                     raise FileNotFoundError
             return np.stack([img_npy], axis=0)
+        
+        elif modality == 'EMG':
+            #tramite start-stop prendere lo spettrogramma associato (preprocessato in precedenza)
+            #struttura file con gli spectrogram -> dict('data', 'start', 'stop')
+            #fare un check con start e stop
+            #ritornare data
+            try:
+                # Load pickle from ./emg_spectrograms
+                data = {}
+                with open(os.path.join(data_path, f'Mel_S04.pkl'), 'rb') as f:
+                    data = pickle.load(f)
+                data = data.loc[record.uid - 1].data
+                
+            except FileNotFoundError:
+                raise FileNotFoundError
+            return data
+
         else:
             raise NotImplementedError("Modality not implemented")
 

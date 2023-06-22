@@ -8,7 +8,7 @@ import pdb
 
 class TRNClassifier(torch.nn.Module):
     # relation module in multi-scale with a classifier at the end
-    def __init__(self, img_feature_dim=1024, num_frames=5, num_class=8):
+    def __init__(self, img_feature_dim=1024, num_frames=5, num_class=11):
         super(TRNClassifier, self).__init__()
         self.subsample_num = 3 # how many relations selected to sum up
         self.img_feature_dim = img_feature_dim
@@ -45,9 +45,9 @@ class TRNClassifier(torch.nn.Module):
         print('Multi-Scale Temporal Relation with classifier in use')
         print(['%d-frame relation' % i for i in self.scales])
 
-    def forward(self, input):
+    def forward(self, x):
         # the first one is the largest scale
-        act_all = input[:, self.relations_scales[0][0] , :]
+        act_all = x[:, self.relations_scales[0][0] , :]
         act_all = act_all.view(act_all.size(0), self.scales[0] * self.img_feature_dim)
         act_all = self.fc_fusion_scales[0](act_all)
         act_all = self.classifier_scales[0](act_all)
@@ -56,12 +56,12 @@ class TRNClassifier(torch.nn.Module):
             # iterate over the scales
             idx_relations_randomsample = np.random.choice(len(self.relations_scales[scaleID]), self.subsample_scales[scaleID], replace=False)
             for idx in idx_relations_randomsample:
-                act_relation = input[:, self.relations_scales[scaleID][idx], :]
+                act_relation = x[:, self.relations_scales[scaleID][idx], :]
                 act_relation = act_relation.view(act_relation.size(0), self.scales[scaleID] * self.img_feature_dim)
                 act_relation = self.fc_fusion_scales[scaleID](act_relation)
                 act_relation = self.classifier_scales[scaleID](act_relation)
                 act_all += act_relation
-        return act_all, None
+        return act_all, {'features': x}
 
     def return_relationset(self, num_frames, num_frames_relation):
         import itertools

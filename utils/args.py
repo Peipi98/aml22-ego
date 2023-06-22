@@ -9,6 +9,7 @@ def add_paths():
     path_conf = OmegaConf.create()
     path_conf.dataset = {}
     path_conf.dataset.RGB = {}
+    path_conf.dataset.EMG = {}
     if platform.node() == 'tiche':
         path_conf.wandb_dir = "/data2/ggoletto/"
         path_conf.dataset.RGB.data_path = "/data/chiara/EK_data/rgb_flow/"
@@ -22,10 +23,10 @@ def add_paths():
         path_conf.models_dir = "/data/mirco/CVPR_AffordanceDA/"
     if platform.node() == "callisto":
         path_conf.wandb_dir = None # I have no idea what this is
-        path_conf.dataset.RGB.data_path = "/home/h4r/Desktop/advanced-machine-learning/project/code/aml22-ego/Data/Epic_Kitchens_reduced"
-    else:
-        path_conf.wandb_dir = None
-        path_conf.dataset.RGB.data_path = None
+        #path_conf.dataset.RGB.data_path = "/home/h4r/Desktop/advanced-machine-learning/project/code/aml22-ego/Data/Epic_Kitchens_reduced"
+        path_conf.dataset.RGB.data_path = "/home/h4r/Desktop/advanced-machine-learning/project/code/aml22-ego/Data/ActionNet_S04"
+        path_conf.dataset.EMG.data_path = "/home/h4r/Desktop/advanced-machine-learning/project/code/aml22-ego/emg_spectrograms"
+        # path_conf.models_dir = "/data/mirco/RAL_EdgeEgoModels/"
     return path_conf
 
 
@@ -33,7 +34,10 @@ def add_paths():
 conf_path = os.path.join(os.path.dirname(__file__), '../configs')
 
 # Retrieve the default config
-args = OmegaConf.load(os.path.join(conf_path, "default.yaml"))
+#args = OmegaConf.load(os.path.join(conf_path, "default.yaml"))
+args = OmegaConf.load(os.path.join(conf_path, "multi_modalities.yaml"))
+
+#print("args: ", args)
 
 # Read the cli args
 cli_args = OmegaConf.from_cli()
@@ -46,10 +50,14 @@ else:
     conf_args = OmegaConf.load(os.path.join(conf_path, "debug.yaml"))
     args = OmegaConf.merge(args, conf_args)
 
+#print("args: ", args)
+
 path_args = add_paths()
 args = OmegaConf.merge(args, path_args)
 # Merge cli args into config ones
 args = OmegaConf.merge(args, cli_args)
+
+#print("args: ", args)
 
 # add log directories
 args.experiment_dir = os.path.join(args.name, datetime.now().strftime('%b%d_%H-%M-%S'))

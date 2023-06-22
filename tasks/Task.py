@@ -71,6 +71,12 @@ class Task(torch.nn.Module, metaclass=ABCMeta):
             os.path.basename(os.path.normpath(date)), "%b%d_%H-%M-%S")))[-1])
         last_models_dir = last_dir.iterdir()
         for m in self.modalities:
+            #In this case we just upload the model without using the EK conf
+            if m == 'EMG':
+                model_path = os.path.join('./pretrained_emgcnn/', 'EMG_CNN.pth')
+                torch.load(model_path)
+                continue
+
             # get only models which belong to this task and for this modality
             model = list(filter(lambda x:
                                 m == x.name.split('.')[0].split('_')[-2] and
@@ -109,6 +115,10 @@ class Task(torch.nn.Module, metaclass=ABCMeta):
             os.path.basename(os.path.normpath(date)), "%b%d_%H-%M-%S")))[-1]
         saved_models = [x for x in reversed(sorted(Path(last_models_dir).iterdir(), key=os.path.getmtime))]
         for m in self.modalities:
+            if m == 'EMG':
+                model_path = os.path.join('./pretrained_emgcnn/', 'EMG_CNN.pth')
+                torch.load(model_path)
+                continue
             # get only models which belong to this task and for this modality
             model = list(filter(lambda x:
                                 m == x.name.split('.')[0].split('_')[-2] and
