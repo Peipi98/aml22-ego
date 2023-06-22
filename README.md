@@ -1,32 +1,42 @@
-# Starting code for course project of Advanced Machine Learning (AML) 2022
-"Multimodal Egocentric Vision" exam project.
+# Project Code for AML 2022 @ Politecnico di Torino
 
+## Team members
+- [Giuseppe Atanasio](s300733@studenti.polito.it)
+- [Federico Mustich](federico.mustich@studenti.polito.it)
+- [Francesco Sorrentino](s301655@studenti.polito.it)
 
-## Getting started
+To run the instructions, be careful to set the correct configs for the specific configuration you want to run.
 
-You can play around with the code on your local machine, and use Google Colab for training on GPUs. 
-In all the cases it is necessary to have the reduced version of the dataset where you are running the code. For simplicity, we inserted just the necessary frames at [this link](https://drive.google.com/drive/folders/1dJOtZ07WovP3YSCRAnU0E4gsfqDzpMVo?usp=share_link).
+## Feature Extraction
 
-Before starting to implement your own code, make sure to:
-1. read and study the material provided
-2. understand how all the scripts are working and interacting
-3. get familiar with the structure of the [EPIC-KITCHENS dataset](https://epic-kitchens.github.io/2022), what a sample, a clip and a frame are
-4. play around with the code in the template to familiarize with all the tools.
+### 1. Extract EK-RGB features
+`python save_feat.py config=configs/I3D_save_feat.yaml dataset.shift=D1-D1 name=save_feat_I3D_EK`
 
-Some scripts do not need to be run (i.e., [train_classifier_scratch.py](./train_classifier_scratch.py)) but are still inserted in the template in order to make the students understand how the baseline models are obtained.
+### 2. Resampling EMG for LSTM 
+`python EMG/EMG_preprocessing.py`
 
-### 1. Local
+### 3. Extract ActionSense RGB+EMG features
+`python save_feat_action-net.py config=configs/I3D_save_feat.yaml dataset.shift=D1-S04 name=save_feat_I3D_AS`
 
-You can work on your local machine directly, the code which needs to be run does not require heavy computations. 
-In order to do so a file with all the requirements for the python environment is provided [here](requirements.yaml), it contains even more packages than the strictly needed ones so if you want to install everything step-by-step just be careful to use pytorch 1.12 and torchvision 0.13. 
+## Training
 
-### 2. Google Colab
+### 1. Fully Connected Classifier 
+`python train_classifier.py name=classifierD1 dataset.shift=D1-D1`
 
-You can also run the code on [Google Colab](https://colab.research.google.com/).
+using Classifier2 on model inside configs/default.yaml
 
-- Upload all the scripts in this repo.
-- Prepare a proper notebook structured as the `train_classifier.py` script.
+### 2. TRN Classifier
+`python train_TRN.py name=classifierD1 dataset.shift=D1-D1`
 
-As a reference, `colab_runner.ipynb` provides an example of how to set up a working environment in Google Colab.
+using TRNClassifier on model inside configs/default.yaml
 
-NOTE: you need to stay connected to the Google Colab interface at all times for your python scripts to keep training.
+### 3. EMG-LSTM Classifier
+`python EMG/EMG_train.py`
+
+### 4. EMG-CNN Classifier
+`python EMG_CNN.py`
+
+### 5. Multimodal Classifier
+`python train_multimodal.py name=classifierS04 dataset.shift=S04-S04`
+
+using configs/multi_modalities.yaml
